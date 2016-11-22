@@ -1,5 +1,6 @@
 var CleanWebpackPlugin = require('clean-webpack-plugin');
 var CopyWebpackPlugin = require('copy-webpack-plugin');
+const ExtractTextPlugin = require('extract-text-webpack-plugin');
 
 module.exports = {
   entry: './src/index.js',
@@ -22,6 +23,10 @@ module.exports = {
         loader: 'file?name=[name].[ext]'
       },
       {
+        test: /\.(css|s[ac]ss)$/,
+        loader: ExtractTextPlugin.extract('css!sass')
+      },
+      {
         test: /\.elm$/,
         exclude: [/elm-stuff/, /node_modules/],
         loader: 'elm-hot!elm-webpack'
@@ -39,7 +44,10 @@ module.exports = {
     }),
     new CopyWebpackPlugin([
       { from: 'src/assets', to: 'assets'}
-    ])
+    ]),
+    new ExtractTextPlugin('styles.css', {
+      allChunks: true
+    })
   ],
 
   devServer: {

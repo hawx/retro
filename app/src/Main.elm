@@ -93,15 +93,33 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    Html.div []
-        [ Html.input [ Event.onInput ChangeInput ] [ ]
-        , Html.button [ Event.onClick AddCard ] [ Html.text "Add" ]
-        , cardsView model.cards
+    Html.div [ Attr.class "container" ]
+        [ cardsView model.cards
         ]
 
 cardsView cards =
-    Html.div [] <|
-        List.map (\c -> Html.div [] [ Html.text c ]) cards
+    Html.div [ Attr.class "columns" ]
+        [ Html.div [ Attr.class "column" ] <|
+              (List.map cardView cards) ++ [addCardView]
+        ]
+
+cardView text =
+    Html.div [ Attr.class "card" ]
+        [ Html.div [ Attr.class "card-content" ]
+              [ Html.div [ Attr.class "content" ]
+                    [ Html.text text ]
+              ]
+        ]
+
+addCardView =
+    Html.div [ Attr.class "card" ]
+        [ Html.div [ Attr.class "card-content" ]
+              [ Html.div [ Attr.class "content" ]
+                    [ Html.input [ Event.onInput ChangeInput ] [ ]
+                    , Html.button [ Event.onClick AddCard ] [ Html.text "Add" ]
+                    ]
+              ]
+        ]
 
 -- Subscriptions
 

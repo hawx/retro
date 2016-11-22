@@ -1,0 +1,9 @@
+@import "~bulma";
+
+body {
+  margin: 1rem;
+}
+
+.card + .card {
+  margin-top: 1rem;
+}
