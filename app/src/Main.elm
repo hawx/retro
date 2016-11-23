@@ -3,6 +3,8 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
 import String
+import Dict exposing (Dict)
+import Array exposing (Array)
 import WebSocket
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
@@ -18,22 +20,28 @@ main =
 
 -- Model
 
+type alias Card =
+    { text : String
+    , votes : Int
+    , author : String
+    }
+
 type alias Model =
     { id : String
-    , cards : List String
+    , columns : Dict String (List Card)
     , input : String
     }
 
 init : (Model, Cmd msg)
 init =
     { id = ""
-    , cards = []
+    , columns = Dict.empty
     , input = ""
     } ! []
 
 -- Update
 
-type Msg = Socket String | AddCard | ChangeInput String
+type Msg = Socket String | AddCard String | ChangeInput String
 
 type alias SocketMsg =
     { id : String
@@ -59,11 +67,11 @@ socketMsgEncoder value =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        AddCard ->
+        AddCard columnName ->
             model ! [WebSocket.send "ws://localhost:8080/ws"
                          <| Encode.encode 0
                          <| socketMsgEncoder
-                         <| SocketMsg model.id "add" [model.input]
+                         <| SocketMsg model.id "add" [columnName, model.input]
                     ]
 
         ChangeInput input ->
@@ -77,46 +85,88 @@ update msg model =
                     Ok v ->
                         case v.op of
                             "init" ->
-                                { model
-                                    | cards = (model.cards ++ v.args)
-                                    , id = v.id } ! []
+                                { model | id = v.id } ! []
 
                             "add" ->
-                                { model | cards = (model.cards ++ v.args) } ! []
+                                { model | columns = addCard model.columns v.args } ! []
+
+                            "column" ->
+                                { model | columns = addColumn model.columns v.args } ! []
 
                             _  ->
                                 model ! []
                     Err _ ->
                         model ! []
 
+mapOrJust : (a -> b) -> b -> Maybe a -> Maybe b
+mapOrJust f value maybe =
+    case maybe of
+        Just _ -> Maybe.map f maybe
+        Nothing -> Just value
+
+addColumn : Dict String (List Card) -> List String -> Dict String (List Card)
+addColumn columns args =
+    case List.head args of
+        Nothing -> columns
+        Just name -> Dict.insert name [] columns
+
+addCard : Dict String (List Card) -> List String -> Dict String (List Card)
+addCard columns cardDetails =
+    let
+        cardArray = Array.fromList cardDetails
+        columnName = Array.get 0 cardArray
+        cardText = Array.get 1 cardArray
+        cardFromText text = { text = text, author = "", votes = 0 }
+        addToColumn column text =
+            Dict.update column (\x -> mapOrJust (\l -> (cardFromText text) :: l) [cardFromText text] x
+                               ) columns
+    in
+        Maybe.withDefault columns
+            <| Maybe.map2 (addToColumn) columnName cardText
+
 -- View
 
 view : Model -> Html Msg
 view model =
-    Html.div [ Attr.class "container" ]
-        [ cardsView model.cards
+    Html.div [ Attr.class "container is-fluid" ]
+        [ columnsView model.columns
         ]
 
-cardsView cards =
+columnsView : Dict String (List Card) -> Html Msg
+columnsView columns =
     Html.div [ Attr.class "columns" ]
-        [ Html.div [ Attr.class "column" ] <|
-              (List.map cardView cards) ++ [addCardView]
-        ]
+        <| List.map columnView
+        <| Dict.toList columns
 
-cardView text =
+columnView : (String, List Card) -> Html Msg
+columnView (columnName, cards) =
+    Html.div [ Attr.class "column" ]
+        <| [titleCardView columnName] ++ List.map cardView cards ++ [addCardView columnName]
+
+cardView : Card -> Html Msg
+cardView card =
     Html.div [ Attr.class "card" ]
         [ Html.div [ Attr.class "card-content" ]
               [ Html.div [ Attr.class "content" ]
-                    [ Html.text text ]
+                    [ Html.text card.text ]
               ]
         ]
 
-addCardView =
+titleCardView : String -> Html Msg
+titleCardView title =
+    Html.div [ Attr.class "card" ]
+        [ Html.div [ Attr.class "card-content" ]
+              [ Html.div [ Attr.class "content" ]
+                    [ Html.text title ]
+              ]
+        ]
+
+addCardView columnName =
     Html.div [ Attr.class "card" ]
         [ Html.div [ Attr.class "card-content" ]
               [ Html.div [ Attr.class "content" ]
                     [ Html.input [ Event.onInput ChangeInput ] [ ]
-                    , Html.button [ Event.onClick AddCard ] [ Html.text "Add" ]
+                    , Html.button [ Event.onClick (AddCard columnName) ] [ Html.text "Add" ]
                     ]
               ]
         ]

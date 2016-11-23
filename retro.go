@@ -15,8 +15,14 @@ type msg struct {
 }
 
 type Retro struct {
-	cards []string
-	conns map[string]*websocket.Conn
+	columns map[string][]Card
+	conns   map[string]*websocket.Conn
+}
+
+type Card struct {
+	text   string
+	votes  int
+	author string
 }
 
 func (r *Retro) broadcast(data msg) {
@@ -34,7 +40,14 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 	ids := id.String()
 
 	r.conns[ids] = ws
-	websocket.JSON.Send(ws, msg{Id: ids, Op: "init", Args: r.cards})
+
+	websocket.JSON.Send(ws, msg{Id: ids, Op: "init", Args: []string{}})
+	for columnName, cards := range r.columns {
+		websocket.JSON.Send(ws, msg{Id: ids, Op: "column", Args: []string{columnName}})
+		for _, card := range cards {
+			websocket.JSON.Send(ws, msg{Id: ids, Op: "add", Args: []string{columnName, card.text}})
+		}
+	}
 
 	for {
 		var data msg
@@ -45,15 +58,25 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 
 		switch data.Op {
 		case "add":
-			r.cards = append(r.cards, data.Args[0])
-			r.broadcast(msg{Id: ids, Op: "add", Args: []string{data.Args[0]}})
+			columnName, cardText := data.Args[0], data.Args[1]
+
+			r.columns[columnName] = append(r.columns[columnName],
+				Card{text: cardText, author: ids})
+
+			r.broadcast(msg{Id: ids, Op: "add", Args: []string{columnName, cardText}})
 		}
 	}
 }
 
 func main() {
 	retro := &Retro{
-		cards: []string{"what"},
+		columns: map[string][]Card{
+			"Start": []Card{},
+			"More":  []Card{},
+			"Keep":  []Card{},
+			"Less":  []Card{},
+			"Stop":  []Card{},
+		},
 		conns: map[string]*websocket.Conn{},
 	}
 
