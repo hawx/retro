@@ -7,3 +7,23 @@ body {
 .card + .card {
   margin-top: 1rem;
 }
+
+.card.dragging {
+  opacity: .8;
+}
+
+.content.over {
+  color: red;
+}
+
+.column.over {
+  border: 1px dashed black;
+}
+
+[draggable] {
+  cursor: pointer;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
