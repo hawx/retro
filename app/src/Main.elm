@@ -11,6 +11,8 @@ import WebSocket
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
+import Column exposing (Column, Card)
+import Retro exposing (Retro)
 
 main =
     Html.program
@@ -22,22 +24,9 @@ main =
 
 -- Model
 
-type alias Card =
-    { id : String
-    , text : String
-    , votes : Int
-    , author : String
-    }
-
-type alias Column =
-    { id : String
-    , name : String
-    , cards : Dict String Card
-    }
-
 type alias Model =
     { id : String
-    , columns : Dict String Column
+    , retro : Retro
     , input : String
     , cardOver : Maybe (String, String)
     , columnOver : Maybe String
@@ -46,7 +35,7 @@ type alias Model =
 init : (Model, Cmd msg)
 init =
     { id = ""
-    , columns = Dict.empty
+    , retro = Retro.empty
     , input = ""
     , cardOver = Nothing
     , columnOver = Nothing
@@ -111,16 +100,12 @@ update msg model =
         DragLeave _ ->
             { model | columnOver = Nothing } ! []
         Drop ->
-            case model.cardOver of
-                Nothing -> model ! []
-                Just (columnFrom, cardId) ->
-                    case model.columnOver of
-                        Nothing -> model ! []
-                        Just columnTo ->
-                            { model
-                                | columnOver = Nothing
-                                , cardOver = Nothing
-                            } ! [ sendMoveCard model.id columnFrom columnTo cardId ]
+            let
+                move (columnFrom, cardId) columnTo = { model | columnOver = Nothing , cardOver = Nothing
+                                                     } ! [ sendMoveCard model.id columnFrom columnTo cardId ]
+            in
+                Maybe.map2 move model.cardOver model.columnOver
+                    |> Maybe.withDefault (model, Cmd.none)
 
         AddCard columnId ->
             model ! [ sendAddCard model.id columnId model.input ]
@@ -129,88 +114,53 @@ update msg model =
             { model | input = input } ! []
 
         Socket data ->
-            let
-                socketMsg = Debug.log "" <| Decode.decodeString socketMsgDecoder data
-            in
-                case socketMsg of
-                    Ok v ->
-                        case v.op of
-                            "init" ->
-                                { model | id = v.id } ! []
+            case Decode.decodeString socketMsgDecoder data of
+                Ok socketMsg -> socketUpdate socketMsg model
+                Err _ -> model ! []
 
-                            "add" ->
-                                { model | columns = addCard model.columns v.args } ! []
 
-                            "column" ->
-                                { model | columns = addColumn model.columns v.args } ! []
+socketUpdate : SocketMsg -> Model -> (Model, Cmd Msg)
+socketUpdate msg model =
+    case msg.op of
+        "init" ->
+            { model | id = msg.id } ! []
 
-                            "move" ->
-                                { model | columns = moveCard model.columns v.args } ! []
+        "add" ->
+            case msg.args of
+                [columnId, cardId, cardText] ->
+                    let
+                        card = { id = cardId, author = model.id, votes = 0, text = cardText }
+                    in
+                        { model | retro = Retro.addCard columnId card model.retro } ! []
+                _ ->
+                    model ! []
 
-                            _  ->
-                                model ! []
-                    Err _ ->
-                        model ! []
+        "column" ->
+            case msg.args of
+                [columnId, columnName] ->
+                    let
+                        column = { id = columnId, name = columnName, cards = Dict.empty }
+                    in
+                        { model | retro = Retro.addColumn column model.retro } ! []
+                _ ->
+                    model ! []
 
-getCard : String -> String -> Dict String Column -> Maybe Card
-getCard columnId cardId columns =
-    case Dict.get columnId columns of
-        Nothing -> Nothing
-        Just column ->
-            Dict.get cardId column.cards
-
-addColumn : Dict String Column -> List String -> Dict String Column
-addColumn columns args =
-    case args of
-        [columnId, columnName] ->
-            let
-                column : Column
-                column = { id = columnId, name = columnName, cards = Dict.empty }
-            in
-                Dict.insert columnId column columns
-        _ -> columns
-
-addCard : Dict String Column -> List String -> Dict String Column
-addCard columns args =
-    case args of
-        [columnId, cardId, cardText] ->
-            let
-                card : Card
-                card = { id = cardId, text = cardText, author = "", votes = 0 }
-
-                insertCard : Column -> Column
-                insertCard column = { column | cards = Dict.insert cardId card column.cards }
-            in
-                Dict.update columnId (Maybe.map insertCard) columns
+        "move" ->
+            case msg.args of
+                [columnFrom, columnTo, cardId] ->
+                    { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
+                _ ->
+                    model ! []
 
         _ ->
-            columns
-
-moveCard : Dict String Column -> List String -> Dict String Column
-moveCard columns args =
-    case args of
-        [columnFrom, columnTo, cardId] ->
-            let
-                card = getCard columnFrom cardId columns
-
-                removeCard : Column -> Column
-                removeCard column = { column | cards = Dict.remove cardId column.cards }
-
-                insertCard : Card -> Column -> Column
-                insertCard c column = { column | cards = Dict.insert cardId c column.cards }
-            in
-                Dict.update columnTo (Maybe.map2 insertCard card)
-                    <| Dict.update columnFrom (Maybe.map removeCard) columns
-
-        _ ->
-            columns
+            model ! []
 
 -- View
 
 view : Model -> Html Msg
 view model =
     Html.div [ Attr.class "container is-fluid" ]
-        [ columnsView model.cardOver model.columnOver model.columns
+        [ columnsView model.cardOver model.columnOver model.retro.columns
         ]
 
 columnsView : Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
