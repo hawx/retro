@@ -158,8 +158,44 @@ socketUpdate msg model =
 
 view : Model -> Html Msg
 view model =
-    Html.div [ Attr.class "container is-fluid" ]
-        [ columnsView model.cardOver model.columnOver model.retro.columns
+    Html.div []
+        [ Html.section [ Attr.class "section" ]
+              [ Html.div [ Attr.class "container is-fluid" ]
+                    [ tabsView
+                    , columnsView model.cardOver model.columnOver model.retro.columns
+                  ]
+            ]
+        , Html.footer [ Attr.class "footer" ]
+            [ Html.div [ Attr.class "container" ]
+                  [ Html.div [ Attr.class "content has-text-centered" ]
+                        [ Html.text "A link to github?"
+                        ]
+                  ]
+            ]
+        ]
+
+tabsView : Html Msg
+tabsView =
+    Html.div [ Attr.class "tabs is-toggle" ]
+        [ Html.ul [ Attr.class "is-left" ]
+              [ Html.li [ Attr.class "is-active" ]
+                    [ Html.a [] [ Html.text "Thinking" ]
+                    ]
+              , Html.li []
+                  [ Html.a [] [ Html.text "Presenting" ]
+                  ]
+              , Html.li []
+                  [ Html.a [] [ Html.text "Voting" ]
+                  ]
+              , Html.li []
+                  [ Html.a [] [ Html.text "Discussing" ]
+                  ]
+              ]
+        , Html.ul [ Attr.class "is-right" ]
+            [ Html.li []
+                  [ Html.a [] [ Html.text "05:03 remaining" ]
+                  ]
+            ]
         ]
 
 columnsView : Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
