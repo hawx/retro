@@ -44,8 +44,7 @@ init =
 -- Update
 
 type Msg = Socket String
-         | AddCard String
-         | ChangeInput String
+         | ChangeInput String String
          | MouseOver String String
          | MouseOut String String
          | DragStart
@@ -107,11 +106,11 @@ update msg model =
                 Maybe.map2 move model.cardOver model.columnOver
                     |> Maybe.withDefault (model, Cmd.none)
 
-        AddCard columnId ->
-            model ! [ sendAddCard model.id columnId model.input ]
-
-        ChangeInput input ->
-            { model | input = input } ! []
+        ChangeInput columnId input ->
+            if String.contains "\n" input then
+                { model | input = "" } ! [ sendAddCard model.id columnId model.input ]
+            else
+                { model | input = input } ! []
 
         Socket data ->
             case Decode.decodeString socketMsgDecoder data of
@@ -204,7 +203,7 @@ cardView cardOver columnId (cardId, card) =
 
 titleCardView : String -> Html Msg
 titleCardView title =
-    Html.div [ Attr.class "card-content has-text-centered" ]
+    Html.div [ Attr.class "not-card card-content has-text-centered" ]
         [ Html.div [ Attr.class "content" ]
               [ Html.h1 []
                     [ Html.text title
@@ -217,8 +216,7 @@ addCardView columnId =
     Html.div [ Attr.class "card" ]
         [ Html.div [ Attr.class "card-content" ]
               [ Html.div [ Attr.class "content" ]
-                    [ Html.input [ Event.onInput ChangeInput ] [ ]
-                    , Html.button [ Event.onClick (AddCard columnId) ] [ Html.text "Add" ]
+                    [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
                     ]
               ]
         ]

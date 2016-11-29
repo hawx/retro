@@ -4,8 +4,22 @@ body {
   margin: 1rem;
 }
 
-.card {
-  width: auto;
+.content {
+  word-break: break-all;
+}
+
+.card, .not-card {
+  width: 300px;
+}
+
+.card textarea {
+  overflow: hidden;
+  overflow-wrap: break-word;
+  resize: none;
+  height: 54px;
+  background: 0 0;
+  border: none;
+  box-shadow: none;
 }
 
 .card + .card {
@@ -14,10 +28,6 @@ body {
 
 .card.dragging {
   opacity: .8;
-}
-
-.content.over {
-  color: red;
 }
 
 .column.over {
