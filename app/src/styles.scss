@@ -4,6 +4,10 @@ body {
   margin: 1rem;
 }
 
+.card {
+  width: auto;
+}
+
 .card + .card {
   margin-top: 1rem;
 }

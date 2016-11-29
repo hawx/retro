@@ -204,10 +204,11 @@ cardView cardOver columnId (cardId, card) =
 
 titleCardView : String -> Html Msg
 titleCardView title =
-    Html.div [ Attr.class "card" ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.class "content" ]
-                    [ Html.text title ]
+    Html.div [ Attr.class "card-content has-text-centered" ]
+        [ Html.div [ Attr.class "content" ]
+              [ Html.h1 []
+                    [ Html.text title
+                    ]
               ]
         ]
 
