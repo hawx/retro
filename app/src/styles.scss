@@ -1,9 +1,39 @@
 @import "~bulma";
 
-body {
-  margin: 1rem;
+.content {
+  word-break: break-all;
+}
+
+.card, .not-card {
+  width: 300px;
+}
+
+.card textarea {
+  overflow: hidden;
+  overflow-wrap: break-word;
+  resize: none;
+  height: 54px;
+  background: 0 0;
+  border: none;
+  box-shadow: none;
 }
 
 .card + .card {
   margin-top: 1rem;
+}
+
+.card.dragging {
+  opacity: .8;
+}
+
+.column.over {
+  border: 1px dashed black;
+}
+
+[draggable] {
+  cursor: pointer;
+  -moz-user-select: none;
+  -khtml-user-select: none;
+  -webkit-user-select: none;
+  user-select: none;
 }

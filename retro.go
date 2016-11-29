@@ -1,12 +1,18 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
 
 	"github.com/google/uuid"
 	"golang.org/x/net/websocket"
 )
+
+func strId() string {
+	id, _ := uuid.NewRandom()
+	return id.String()
+}
 
 type msg struct {
 	Id   string   `json:"id"`
@@ -15,8 +21,41 @@ type msg struct {
 }
 
 type Retro struct {
-	columns map[string][]Card
+	// mu, pls
+	columns map[string]*Column
 	conns   map[string]*websocket.Conn
+}
+
+func NewRetro() *Retro {
+	return &Retro{
+		columns: map[string]*Column{},
+		conns:   map[string]*websocket.Conn{},
+	}
+}
+
+func (r *Retro) AddColumn(column *Column) string {
+	id := strId()
+	r.columns[id] = column
+	return id
+}
+
+type Column struct {
+	name string
+	// mu pls
+	cards map[string]*Card
+}
+
+func NewColumn(name string) *Column {
+	return &Column{
+		name:  name,
+		cards: map[string]*Card{},
+	}
+}
+
+func (c *Column) AddCard(card *Card) string {
+	id := strId()
+	c.cards[id] = card
+	return id
 }
 
 type Card struct {
@@ -32,53 +71,80 @@ func (r *Retro) broadcast(data msg) {
 }
 
 func (r *Retro) websocketHandler(ws *websocket.Conn) {
-	id, err := uuid.NewRandom()
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	ids := id.String()
+	connId := strId()
 
-	r.conns[ids] = ws
+	r.conns[connId] = ws
 
-	websocket.JSON.Send(ws, msg{Id: ids, Op: "init", Args: []string{}})
-	for columnName, cards := range r.columns {
-		websocket.JSON.Send(ws, msg{Id: ids, Op: "column", Args: []string{columnName}})
-		for _, card := range cards {
-			websocket.JSON.Send(ws, msg{Id: ids, Op: "add", Args: []string{columnName, card.text}})
+	log.Println("Connected to", connId)
+
+	websocket.JSON.Send(ws, msg{
+		Id:   connId,
+		Op:   "init",
+		Args: []string{},
+	})
+
+	for columnId, column := range r.columns {
+		websocket.JSON.Send(ws, msg{
+			Id:   connId,
+			Op:   "column",
+			Args: []string{columnId, column.name},
+		})
+
+		for cardId, card := range column.cards {
+			websocket.JSON.Send(ws, msg{
+				Id:   connId,
+				Op:   "add",
+				Args: []string{columnId, cardId, card.text},
+			})
 		}
 	}
 
 	for {
 		var data msg
 		if err := websocket.JSON.Receive(ws, &data); err != nil {
-			log.Println(err)
+			if err != io.EOF {
+				log.Println(err)
+			}
 			return
 		}
 
 		switch data.Op {
 		case "add":
-			columnName, cardText := data.Args[0], data.Args[1]
+			columnId, cardText := data.Args[0], data.Args[1]
 
-			r.columns[columnName] = append(r.columns[columnName],
-				Card{text: cardText, author: ids})
+			cardId := r.columns[columnId].AddCard(&Card{
+				text:   cardText,
+				author: connId,
+			})
 
-			r.broadcast(msg{Id: ids, Op: "add", Args: []string{columnName, cardText}})
+			r.broadcast(msg{
+				Id:   connId,
+				Op:   "add",
+				Args: []string{columnId, cardId, cardText},
+			})
+
+		case "move":
+			columnFrom, columnTo, cardId := data.Args[0], data.Args[1], data.Args[2]
+
+			r.columns[columnTo].cards[cardId] = r.columns[columnFrom].cards[cardId]
+			delete(r.columns[columnFrom].cards, cardId)
+
+			r.broadcast(msg{
+				Id:   connId,
+				Op:   "move",
+				Args: []string{columnFrom, columnTo, cardId},
+			})
 		}
 	}
 }
 
 func main() {
-	retro := &Retro{
-		columns: map[string][]Card{
-			"Start": []Card{},
-			"More":  []Card{},
-			"Keep":  []Card{},
-			"Less":  []Card{},
-			"Stop":  []Card{},
-		},
-		conns: map[string]*websocket.Conn{},
-	}
+	retro := NewRetro()
+	retro.AddColumn(NewColumn("Start"))
+	retro.AddColumn(NewColumn("More"))
+	retro.AddColumn(NewColumn("Keep"))
+	retro.AddColumn(NewColumn("Less"))
+	retro.AddColumn(NewColumn("Stop"))
 
 	http.Handle("/ws", websocket.Handler(retro.websocketHandler))
 

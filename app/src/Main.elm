@@ -1,3 +1,5 @@
+port module Main exposing (main)
+
 import Debug
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -9,6 +11,8 @@ import WebSocket
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
+import Column exposing (Column, Card)
+import Retro exposing (Retro)
 
 main =
     Html.program
@@ -20,28 +24,33 @@ main =
 
 -- Model
 
-type alias Card =
-    { text : String
-    , votes : Int
-    , author : String
-    }
-
 type alias Model =
     { id : String
-    , columns : Dict String (List Card)
+    , retro : Retro
     , input : String
+    , cardOver : Maybe (String, String)
+    , columnOver : Maybe String
     }
 
 init : (Model, Cmd msg)
 init =
     { id = ""
-    , columns = Dict.empty
+    , retro = Retro.empty
     , input = ""
+    , cardOver = Nothing
+    , columnOver = Nothing
     } ! []
 
 -- Update
 
-type Msg = Socket String | AddCard String | ChangeInput String
+type Msg = Socket String
+         | ChangeInput String String
+         | MouseOver String String
+         | MouseOut String String
+         | DragStart
+         | DragOver String
+         | DragLeave String
+         | Drop
 
 type alias SocketMsg =
     { id : String
@@ -64,112 +73,205 @@ socketMsgEncoder value =
         , ("args", Encode.list (List.map Encode.string value.args))
         ]
 
+sendAddCard connId columnId cardText =
+    WebSocket.send "ws://localhost:8080/ws"
+        <| Encode.encode 0
+        <| socketMsgEncoder
+        <| SocketMsg connId "add" [columnId, cardText]
+
+sendMoveCard connId columnFrom columnTo cardId =
+    WebSocket.send "ws://localhost:8080/ws"
+        <| Encode.encode 0
+        <| socketMsgEncoder
+        <| SocketMsg connId "move" [columnFrom, columnTo, cardId]
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        AddCard columnName ->
-            model ! [WebSocket.send "ws://localhost:8080/ws"
-                         <| Encode.encode 0
-                         <| socketMsgEncoder
-                         <| SocketMsg model.id "add" [columnName, model.input]
-                    ]
+        MouseOver columnId cardId ->
+            { model | cardOver = Just (columnId, cardId) } ! []
+        MouseOut columnId cardId ->
+            { model | cardOver = Nothing } ! []
 
-        ChangeInput input ->
-            { model | input = input } ! []
+        DragStart -> model ! []
+        DragOver columnId ->
+            { model | columnOver = Just columnId } ! []
+        DragLeave _ ->
+            { model | columnOver = Nothing } ! []
+        Drop ->
+            let
+                move (columnFrom, cardId) columnTo = { model | columnOver = Nothing , cardOver = Nothing
+                                                     } ! [ sendMoveCard model.id columnFrom columnTo cardId ]
+            in
+                Maybe.map2 move model.cardOver model.columnOver
+                    |> Maybe.withDefault (model, Cmd.none)
+
+        ChangeInput columnId input ->
+            if String.contains "\n" input then
+                { model | input = "" } ! [ sendAddCard model.id columnId model.input ]
+            else
+                { model | input = input } ! []
 
         Socket data ->
-            let
-                socketMsg = Debug.log "" <| Decode.decodeString socketMsgDecoder data
-            in
-                case socketMsg of
-                    Ok v ->
-                        case v.op of
-                            "init" ->
-                                { model | id = v.id } ! []
+            case Decode.decodeString socketMsgDecoder data of
+                Ok socketMsg -> socketUpdate socketMsg model
+                Err _ -> model ! []
 
-                            "add" ->
-                                { model | columns = addCard model.columns v.args } ! []
 
-                            "column" ->
-                                { model | columns = addColumn model.columns v.args } ! []
+socketUpdate : SocketMsg -> Model -> (Model, Cmd Msg)
+socketUpdate msg model =
+    case msg.op of
+        "init" ->
+            { model | id = msg.id } ! []
 
-                            _  ->
-                                model ! []
-                    Err _ ->
-                        model ! []
+        "add" ->
+            case msg.args of
+                [columnId, cardId, cardText] ->
+                    let
+                        card = { id = cardId, author = model.id, votes = 0, text = cardText }
+                    in
+                        { model | retro = Retro.addCard columnId card model.retro } ! []
+                _ ->
+                    model ! []
 
-mapOrJust : (a -> b) -> b -> Maybe a -> Maybe b
-mapOrJust f value maybe =
-    case maybe of
-        Just _ -> Maybe.map f maybe
-        Nothing -> Just value
+        "column" ->
+            case msg.args of
+                [columnId, columnName] ->
+                    let
+                        column = { id = columnId, name = columnName, cards = Dict.empty }
+                    in
+                        { model | retro = Retro.addColumn column model.retro } ! []
+                _ ->
+                    model ! []
 
-addColumn : Dict String (List Card) -> List String -> Dict String (List Card)
-addColumn columns args =
-    case List.head args of
-        Nothing -> columns
-        Just name -> Dict.insert name [] columns
+        "move" ->
+            case msg.args of
+                [columnFrom, columnTo, cardId] ->
+                    { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
+                _ ->
+                    model ! []
 
-addCard : Dict String (List Card) -> List String -> Dict String (List Card)
-addCard columns cardDetails =
-    let
-        cardArray = Array.fromList cardDetails
-        columnName = Array.get 0 cardArray
-        cardText = Array.get 1 cardArray
-        cardFromText text = { text = text, author = "", votes = 0 }
-        addToColumn column text =
-            Dict.update column (\x -> mapOrJust (\l -> (cardFromText text) :: l) [cardFromText text] x
-                               ) columns
-    in
-        Maybe.withDefault columns
-            <| Maybe.map2 (addToColumn) columnName cardText
+        _ ->
+            model ! []
 
 -- View
 
 view : Model -> Html Msg
 view model =
-    Html.div [ Attr.class "container is-fluid" ]
-        [ columnsView model.columns
+    Html.div []
+        [ Html.section [ Attr.class "section" ]
+              [ Html.div [ Attr.class "container is-fluid" ]
+                    [ tabsView
+                    , columnsView model.cardOver model.columnOver model.retro.columns
+                  ]
+            ]
+        , Html.footer [ Attr.class "footer" ]
+            [ Html.div [ Attr.class "container" ]
+                  [ Html.div [ Attr.class "content has-text-centered" ]
+                        [ Html.text "A link to github?"
+                        ]
+                  ]
+            ]
         ]
 
-columnsView : Dict String (List Card) -> Html Msg
-columnsView columns =
+tabsView : Html Msg
+tabsView =
+    Html.div [ Attr.class "tabs is-toggle" ]
+        [ Html.ul [ Attr.class "is-left" ]
+              [ Html.li [ Attr.class "is-active" ]
+                    [ Html.a [] [ Html.text "Thinking" ]
+                    ]
+              , Html.li []
+                  [ Html.a [] [ Html.text "Presenting" ]
+                  ]
+              , Html.li []
+                  [ Html.a [] [ Html.text "Voting" ]
+                  ]
+              , Html.li []
+                  [ Html.a [] [ Html.text "Discussing" ]
+                  ]
+              ]
+        , Html.ul [ Attr.class "is-right" ]
+            [ Html.li []
+                  [ Html.a [] [ Html.text "05:03 remaining" ]
+                  ]
+            ]
+        ]
+
+columnsView : Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
+columnsView cardOver columnOver columns =
     Html.div [ Attr.class "columns" ]
-        <| List.map columnView
+        <| List.map (columnView cardOver columnOver)
         <| Dict.toList columns
 
-columnView : (String, List Card) -> Html Msg
-columnView (columnName, cards) =
-    Html.div [ Attr.class "column" ]
-        <| [titleCardView columnName] ++ List.map cardView cards ++ [addCardView columnName]
+columnView : Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
+columnView cardOver columnOver (columnId, column) =
+    let
+        a = [titleCardView column.name]
+        b = List.map (cardView cardOver columnId) (Dict.toList column.cards)
+        c = [addCardView columnId]
+    in
+        Html.div [ Attr.classList [ ("column", True)
+                                  , ("over", columnOver == Just columnId)
+                                  ]
+                 , onDragOver (DragOver columnId)
+                 , onDragLeave (DragLeave columnId)
+                 , onDrop (Drop)
+                 ]
+            <| a ++ b ++ c
 
-cardView : Card -> Html Msg
-cardView card =
-    Html.div [ Attr.class "card" ]
+cardView : Maybe (String, String) -> String -> (String, Card) -> Html Msg
+cardView cardOver columnId (cardId, card) =
+    Html.div [ Attr.class "card"
+             , Attr.draggable "true"
+             , onDragStart (DragStart)
+             , Event.onMouseOver (MouseOver columnId cardId)
+             , Event.onMouseOut (MouseOut columnId cardId)
+             ]
         [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.class "content" ]
+              [ Html.div [ Attr.classList [ ("content", True)
+                                          , ("over", cardOver == Just (columnId, cardId))
+                                          ]
+                         ]
                     [ Html.text card.text ]
               ]
         ]
 
 titleCardView : String -> Html Msg
 titleCardView title =
-    Html.div [ Attr.class "card" ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.class "content" ]
-                    [ Html.text title ]
-              ]
-        ]
-
-addCardView columnName =
-    Html.div [ Attr.class "card" ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.class "content" ]
-                    [ Html.input [ Event.onInput ChangeInput ] [ ]
-                    , Html.button [ Event.onClick (AddCard columnName) ] [ Html.text "Add" ]
+    Html.div [ Attr.class "not-card card-content has-text-centered" ]
+        [ Html.div [ Attr.class "content" ]
+              [ Html.h1 []
+                    [ Html.text title
                     ]
               ]
         ]
+
+addCardView : String -> Html Msg
+addCardView columnId =
+    Html.div [ Attr.class "card" ]
+        [ Html.div [ Attr.class "card-content" ]
+              [ Html.div [ Attr.class "content" ]
+                    [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
+                    ]
+              ]
+        ]
+
+onDragLeave : msg -> Html.Attribute msg
+onDragLeave tagger =
+    Event.on "dragleave" (Decode.succeed tagger)
+
+onDragOver : msg -> Html.Attribute msg
+onDragOver tagger =
+    Event.onWithOptions "dragover" { preventDefault = True, stopPropagation = False } (Decode.succeed tagger)
+
+onDrop : msg -> Html.Attribute msg
+onDrop tagger =
+    Event.onWithOptions "drop" { preventDefault = True, stopPropagation = False } (Decode.succeed tagger)
+
+onDragStart : msg -> Html.Attribute msg
+onDragStart tagger =
+    Attr.attribute "ondragstart" "event.dataTransfer.setData('text/html', event.target.innerHTML)"
 
 -- Subscriptions
 
