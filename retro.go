@@ -21,6 +21,7 @@ type msg struct {
 }
 
 type Retro struct {
+	stage string
 	// mu, pls
 	columns map[string]*Column
 	conns   map[string]*websocket.Conn
@@ -59,15 +60,23 @@ func (c *Column) AddCard(card *Card) string {
 }
 
 type Card struct {
-	text   string
-	votes  int
-	author string
+	text     string
+	votes    int
+	author   string
+	revealed bool
 }
 
 func (r *Retro) broadcast(data msg) {
 	for _, conn := range r.conns {
 		websocket.JSON.Send(conn, data)
 	}
+}
+
+func boolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
 }
 
 func (r *Retro) websocketHandler(ws *websocket.Conn) {
@@ -83,6 +92,14 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 		Args: []string{},
 	})
 
+	if r.stage != "" {
+		websocket.JSON.Send(ws, msg{
+			Id:   connId,
+			Op:   "stage",
+			Args: []string{r.stage},
+		})
+	}
+
 	for columnId, column := range r.columns {
 		websocket.JSON.Send(ws, msg{
 			Id:   connId,
@@ -94,7 +111,7 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 			websocket.JSON.Send(ws, msg{
 				Id:   connId,
 				Op:   "add",
-				Args: []string{columnId, cardId, card.text},
+				Args: []string{columnId, cardId, card.text, boolToString(card.revealed)},
 			})
 		}
 	}
@@ -113,14 +130,15 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 			columnId, cardText := data.Args[0], data.Args[1]
 
 			cardId := r.columns[columnId].AddCard(&Card{
-				text:   cardText,
-				author: connId,
+				text:     cardText,
+				author:   connId,
+				revealed: false,
 			})
 
 			r.broadcast(msg{
 				Id:   connId,
 				Op:   "add",
-				Args: []string{columnId, cardId, cardText},
+				Args: []string{columnId, cardId, cardText, boolToString(false)},
 			})
 
 		case "move":
@@ -133,6 +151,17 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 				Id:   connId,
 				Op:   "move",
 				Args: []string{columnFrom, columnTo, cardId},
+			})
+
+		case "stage":
+			stage := data.Args[0]
+
+			r.stage = stage
+
+			r.broadcast(msg{
+				Id:   connId,
+				Op:   "stage",
+				Args: []string{stage},
 			})
 		}
 	}

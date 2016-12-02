@@ -11,6 +11,7 @@ type alias Card =
     , text : String
     , votes : Int
     , author : String
+    , revealed : Bool
     }
 
 type alias Column =

@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Bulma
 import Debug
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -24,8 +25,11 @@ main =
 
 -- Model
 
+type Stage = Thinking | Presenting | Voting | Discussing
+
 type alias Model =
     { id : String
+    , stage : Stage
     , retro : Retro
     , input : String
     , cardOver : Maybe (String, String)
@@ -35,6 +39,7 @@ type alias Model =
 init : (Model, Cmd msg)
 init =
     { id = ""
+    , stage = Thinking
     , retro = Retro.empty
     , input = ""
     , cardOver = Nothing
@@ -51,6 +56,7 @@ type Msg = Socket String
          | DragOver String
          | DragLeave String
          | Drop
+         | SetStage Stage
 
 type alias SocketMsg =
     { id : String
@@ -85,9 +91,18 @@ sendMoveCard connId columnFrom columnTo cardId =
         <| socketMsgEncoder
         <| SocketMsg connId "move" [columnFrom, columnTo, cardId]
 
+sendSetStage connId stage =
+    WebSocket.send "ws://localhost:8080/ws"
+        <| Encode.encode 0
+        <| socketMsgEncoder
+        <| SocketMsg connId "stage" [toString stage]
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        SetStage stage ->
+            { model | stage = stage } ! [ sendSetStage model.id stage ]
+
         MouseOver columnId cardId ->
             { model | cardOver = Just (columnId, cardId) } ! []
         MouseOut columnId cardId ->
@@ -124,11 +139,24 @@ socketUpdate msg model =
         "init" ->
             { model | id = msg.id } ! []
 
+        "stage" ->
+            case msg.args of
+                [stage] ->
+                    case stage of
+                        "Thinking" -> { model | stage = Thinking } ! []
+                        "Presenting" -> { model | stage = Presenting } ! []
+                        "Voting" -> { model | stage = Voting } ! []
+                        "Discussing" -> { model | stage = Discussing } ! []
+                        _ -> model ! []
+
+                _ ->
+                    model ! []
+
         "add" ->
             case msg.args of
-                [columnId, cardId, cardText] ->
+                [columnId, cardId, cardText, cardRevealed] ->
                     let
-                        card = { id = cardId, author = model.id, votes = 0, text = cardText }
+                        card = { id = cardId, author = model.id, votes = 0, text = cardText, revealed = cardRevealed == "true" }
                     in
                         { model | retro = Retro.addCard columnId card model.retro } ! []
                 _ ->
@@ -161,8 +189,8 @@ view model =
     Html.div []
         [ Html.section [ Attr.class "section" ]
               [ Html.div [ Attr.class "container is-fluid" ]
-                    [ tabsView
-                    , columnsView model.cardOver model.columnOver model.retro.columns
+                    [ tabsView model.stage
+                    , columnsView model.stage model.cardOver model.columnOver model.retro.columns
                   ]
             ]
         , Html.footer [ Attr.class "footer" ]
@@ -174,68 +202,78 @@ view model =
             ]
         ]
 
-tabsView : Html Msg
-tabsView =
-    Html.div [ Attr.class "tabs is-toggle" ]
-        [ Html.ul [ Attr.class "is-left" ]
-              [ Html.li [ Attr.class "is-active" ]
-                    [ Html.a [] [ Html.text "Thinking" ]
+tabsView : Stage -> Html Msg
+tabsView stage =
+    let
+        tab s =
+            Html.li [ Attr.classList [("is-active", stage == s)]
+                    , Event.onClick (SetStage s)
                     ]
-              , Html.li []
-                  [ Html.a [] [ Html.text "Presenting" ]
+                [ Html.a [] [ Html.text (toString s) ]
+                ]
+    in
+        Bulma.tabs [ Attr.class "is-toggle" ]
+            [ Html.ul [ Attr.class "is-left" ]
+                  [ tab Thinking
+                  , tab Presenting
+                  , tab Voting
+                  , tab Discussing
                   ]
-              , Html.li []
-                  [ Html.a [] [ Html.text "Voting" ]
-                  ]
-              , Html.li []
-                  [ Html.a [] [ Html.text "Discussing" ]
-                  ]
-              ]
-        , Html.ul [ Attr.class "is-right" ]
-            [ Html.li []
-                  [ Html.a [] [ Html.text "05:03 remaining" ]
-                  ]
+            , Html.ul [ Attr.class "is-right" ]
+                [ Html.li []
+                      [ Html.a [] [ Html.text "05:03 remaining" ]
+                      ]
+                ]
             ]
-        ]
 
-columnsView : Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
-columnsView cardOver columnOver columns =
-    Html.div [ Attr.class "columns" ]
-        <| List.map (columnView cardOver columnOver)
+columnsView : Stage -> Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
+columnsView stage cardOver columnOver columns =
+    Bulma.columns [ ]
+        <| List.map (columnView stage cardOver columnOver)
         <| Dict.toList columns
 
-columnView : Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
-columnView cardOver columnOver (columnId, column) =
+columnView : Stage -> Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
+columnView stage cardOver columnOver (columnId, column) =
     let
-        a = [titleCardView column.name]
-        b = List.map (cardView cardOver columnId) (Dict.toList column.cards)
-        c = [addCardView columnId]
+        title = [titleCardView column.name]
+        list = List.map (cardView stage cardOver columnId) (Dict.toList column.cards)
+        add = [addCardView columnId]
     in
-        Html.div [ Attr.classList [ ("column", True)
-                                  , ("over", columnOver == Just columnId)
-                                  ]
-                 , onDragOver (DragOver columnId)
-                 , onDragLeave (DragLeave columnId)
-                 , onDrop (Drop)
-                 ]
-            <| a ++ b ++ c
+        case stage of
+            Thinking ->
+                Bulma.column [ Attr.classList [ ("over", columnOver == Just columnId)
+                                              ]
+                             , onDragOver (DragOver columnId)
+                             , onDragLeave (DragLeave columnId)
+                             , onDrop (Drop)
+                             ]
+                    (title ++ list ++ add)
 
-cardView : Maybe (String, String) -> String -> (String, Card) -> Html Msg
-cardView cardOver columnId (cardId, card) =
-    Html.div [ Attr.class "card"
-             , Attr.draggable "true"
-             , onDragStart (DragStart)
-             , Event.onMouseOver (MouseOver columnId cardId)
-             , Event.onMouseOut (MouseOut columnId cardId)
-             ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.classList [ ("content", True)
-                                          , ("over", cardOver == Just (columnId, cardId))
-                                          ]
-                         ]
-                    [ Html.text card.text ]
-              ]
-        ]
+            _ ->
+                Html.div [ Attr.class "column" ]
+                    (title ++ list)
+
+cardView : Stage -> Maybe (String, String) -> String -> (String, Card) -> Html Msg
+cardView stage cardOver columnId (cardId, card) =
+    case stage of
+        Thinking ->
+            Bulma.card [ Attr.draggable "true"
+                     , onDragStart (DragStart)
+                     , Event.onMouseOver (MouseOver columnId cardId)
+                     , Event.onMouseOut (MouseOut columnId cardId)
+                     ]
+                [ Bulma.content [ Attr.classList [ ("over", cardOver == Just (columnId, cardId))
+                                                 ]
+                                ]
+                      [ Html.text card.text ]
+                ]
+
+        _ ->
+            Bulma.card []
+                [ Bulma.content []
+                      [ Html.text card.text ]
+                ]
+
 
 titleCardView : String -> Html Msg
 titleCardView title =
@@ -249,11 +287,9 @@ titleCardView title =
 
 addCardView : String -> Html Msg
 addCardView columnId =
-    Html.div [ Attr.class "card" ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.class "content" ]
-                    [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
-                    ]
+    Bulma.card []
+        [ Bulma.content []
+              [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
               ]
         ]
 
