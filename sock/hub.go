@@ -5,15 +5,8 @@ package sock
 import (
 	"sync"
 
-	"github.com/google/uuid"
-
 	"golang.org/x/net/websocket"
 )
-
-func strId() string {
-	id, _ := uuid.NewRandom()
-	return id.String()
-}
 
 // Msg is a standard message type that should work for all the use cases required.
 type Msg struct {
@@ -43,62 +36,42 @@ func (c *Conn) Broadcast(msg Msg) {
 }
 
 type Hub struct {
-	mu sync.RWMutex
-
-	// The current list of open connections keyed by connectionId
-	connections map[string]*websocket.Conn
-
-	// A map between connectionId->userId. Since a connection may reconnect for
-	// the same user outside of the scope of this package we need to maintain the
-	// illusion of a constant connection, hence constant id, this map maps from
-	// the changing id to the constant id. I hate it. It can probably be removed
-	// when I think up a better way to uniquely identify connections/users.
-	idMap map[string]string
+	mu          sync.RWMutex
+	connections map[*Conn]struct{}
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		connections: map[string]*websocket.Conn{},
-		idMap:       map[string]string{},
+		connections: map[*Conn]struct{}{},
 	}
 }
 
-// AddConnection adds a new connection to the hub, and returns the connectionId.
-func (h *Hub) AddConnection(conn *websocket.Conn) string {
-	connId := strId()
-
-	h.mu.Lock()
-	h.connections[connId] = conn
-	h.mu.Unlock()
-
-	return connId
-}
-
-// NameConnection sets the "name" (userId) for a particular connection.
-func (h *Hub) NameConnection(connId, name string) {
-	h.mu.Lock()
-	h.idMap[connId] = name
-	h.mu.Unlock()
-}
-
-func (h *Hub) Get(connId string) *Conn {
-	h.mu.RLock()
-	name := h.idMap[connId]
-	ws := h.connections[connId]
-	h.mu.RUnlock()
-
-	return &Conn{
-		Name: name,
-		hub:  h,
+// AddConnection adds a new connection to the hub, and returns the connection.
+func (h *Hub) AddConnection(ws *websocket.Conn) *Conn {
+	conn := &Conn{
+		Name: "",
 		ws:   ws,
+		hub:  h,
 	}
+
+	h.mu.Lock()
+	h.connections[conn] = struct{}{}
+	h.mu.Unlock()
+
+	return conn
+}
+
+func (h *Hub) RemoveConnection(conn *Conn) {
+	h.mu.Lock()
+	delete(h.connections, conn)
+	h.mu.Unlock()
 }
 
 func (h *Hub) broadcast(msg Msg) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	for _, conn := range h.connections {
-		websocket.JSON.Send(conn, msg)
+	for conn, _ := range h.connections {
+		websocket.JSON.Send(conn.ws, msg)
 	}
 }
