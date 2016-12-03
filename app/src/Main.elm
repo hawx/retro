@@ -30,6 +30,8 @@ type Stage = Thinking | Presenting | Voting | Discussing
 
 type alias Model =
     { id : String
+    , user : String
+    , joined : Bool
     , stage : Stage
     , retro : Retro
     , input : String
@@ -40,6 +42,8 @@ type alias Model =
 init : (Model, Cmd msg)
 init =
     { id = ""
+    , user = ""
+    , joined = False
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
@@ -64,6 +68,8 @@ type Msg = SetId (Maybe String)
          | Drop
          | SetStage Stage
          | Reveal String String
+         | ChangeName String
+         | Join
 
 type alias SocketMsg =
     { id : String
@@ -118,9 +124,14 @@ sendReveal connId columnId cardId =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        ChangeName name ->
+            { model | user = name } ! []
+        Join ->
+            { model | joined = True } ! [ sendSetId model.user ]
+
         SetId id ->
             case id of
-                Just v -> { model | id = v } ! [ sendSetId v ]
+                Just v -> { model | user = v, joined = True } ! [ sendSetId v ]
                 Nothing -> model ! [ sendGetId ]
 
         SetStage stage ->
@@ -229,21 +240,38 @@ socketUpdate msg model =
 
 view : Model -> Html Msg
 view model =
-    Html.div []
-        [ Html.section [ Attr.class "section" ]
-              [ Html.div [ Attr.class "container is-fluid" ]
-                    [ tabsView model.stage
-                    , columnsView model.id model.stage model.cardOver model.columnOver model.retro.columns
-                  ]
-            ]
-        , Html.footer [ Attr.class "footer" ]
+    let
+        tabs =
+            Html.section [ Attr.class "section" ]
+                [ Html.div [ Attr.class "container is-fluid" ]
+                      [ tabsView model.stage
+                      , columnsView model.id model.stage model.cardOver model.columnOver model.retro.columns
+                      ]
+                ]
+
+        footer =
+          Html.footer [ Attr.class "footer" ]
             [ Html.div [ Attr.class "container" ]
                   [ Html.div [ Attr.class "content has-text-centered" ]
                         [ Html.text "A link to github?"
                         ]
                   ]
             ]
-        ]
+
+        modal =
+          Bulma.modal
+            [ Bulma.box []
+                  [ Bulma.label "Name"
+                  , Bulma.input [ Event.onInput ChangeName ]
+                  , Bulma.button [ Attr.class "is-primary", Event.onClick Join ] [ Html.text "Join" ]
+                  ]
+            ]
+    in
+        if model.joined then
+            Html.div [] [ tabs, footer ]
+        else
+            Html.div [] [ tabs, footer, modal ]
+
 
 tabsView : Stage -> Html Msg
 tabsView stage =
@@ -301,47 +329,45 @@ columnView connId stage cardOver columnOver (columnId, column) =
 
 cardView : String -> Stage -> Maybe (String, String) -> String -> (String, Card) -> List (Html Msg)
 cardView connId stage cardOver columnId (cardId, card) =
-    case stage of
-        Thinking ->
-            if connId == card.author then
-                [ Bulma.card [ Attr.draggable "true"
-                             , onDragStart (DragStart)
-                             , Event.onMouseOver (MouseOver columnId cardId)
-                             , Event.onMouseOut (MouseOut columnId cardId)
-                             ]
-                      [ Bulma.content []
-                            [ Html.text card.text ]
-                      ]
+    let
+        content =
+            Bulma.content []
+                [ Html.p [ Attr.class "title is-6" ] [ Html.text card.author ]
+                , Html.p [] [ Html.text card.text ]
                 ]
-            else
-                []
-
-        Presenting ->
-            if not card.revealed then
+    in
+        case stage of
+            Thinking ->
                 if connId == card.author then
-                    [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
-                                 , Attr.class "mine"
-                                 , Event.onClick (Reveal columnId cardId)
+                    [ Bulma.card [ Attr.draggable "true"
+                                 , onDragStart (DragStart)
+                                 , Event.onMouseOver (MouseOver columnId cardId)
+                                 , Event.onMouseOut (MouseOut columnId cardId)
                                  ]
-                          [ Bulma.content []
-                                [ Html.text card.text ]
-                          ]
+                          [ content ]
                     ]
                 else
                     []
-            else
-                [ Bulma.card [ Attr.classList [("mine", connId == card.author)] ]
-                    [ Bulma.content []
-                          [ Html.text card.text ]
-                    ]
-                ]
 
-        _ ->
-            [ Bulma.card [ Attr.classList [("mine", connId == card.author)] ]
-                [ Bulma.content []
-                      [ Html.text card.text ]
+            Presenting ->
+                if not card.revealed then
+                    if connId == card.author then
+                        [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
+                                     , Event.onClick (Reveal columnId cardId)
+                                     ]
+                              [ content ]
+                        ]
+                    else
+                        []
+                else
+                    [ Bulma.card []
+                          [ content ]
+                    ]
+
+            _ ->
+                [ Bulma.card []
+                      [ content ]
                 ]
-            ]
 
 
 titleCardView : String -> Html Msg
