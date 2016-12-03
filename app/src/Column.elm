@@ -1,18 +1,11 @@
 module Column exposing ( Column
-                       , Card
                        , getCard
                        , addCard
-                       , removeCard)
+                       , removeCard
+                       , updateCard)
 
 import Dict exposing (Dict)
-
-type alias Card =
-    { id : String
-    , text : String
-    , votes : Int
-    , author : String
-    , revealed : Bool
-    }
+import Card exposing (Card)
 
 type alias Column =
     { id : String
@@ -31,3 +24,7 @@ addCard card column =
 removeCard : String -> Column -> Column
 removeCard cardId column =
     { column | cards = Dict.remove cardId column.cards }
+
+updateCard : String -> (Card -> Card) -> Column -> Column
+updateCard cardId f column =
+    { column | cards = Dict.update cardId (Maybe.map f) column.cards }

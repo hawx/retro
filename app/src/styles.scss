@@ -8,6 +8,31 @@
   width: 300px;
 }
 
+.card.hidden {
+  display: none;
+}
+
+.card.not-revealed {
+  opacity: .5;
+
+  &:hover {
+    opacity: 1;
+
+    &::after {
+      content: 'Reveal';
+      color: white;
+      background: rgba(0,0,0,.5);
+      display: block;
+      height: 100%;
+      line-height: 100%;
+      width: 100%;
+      position: absolute;
+      top: 0;
+      text-align: center;
+    }
+  }
+}
+
 .card textarea {
   overflow: hidden;
   overflow-wrap: break-word;

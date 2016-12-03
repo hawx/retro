@@ -12,7 +12,8 @@ import WebSocket
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
-import Column exposing (Column, Card)
+import Column exposing (Column)
+import Card exposing (Card)
 import Retro exposing (Retro)
 
 main =
@@ -44,11 +45,16 @@ init =
     , input = ""
     , cardOver = Nothing
     , columnOver = Nothing
-    } ! []
+    } ! [ storageGet "id" ]
 
 -- Update
 
-type Msg = Socket String
+port storageSet : (String, String) -> Cmd msg
+port storageGet : String -> Cmd msg
+port storageGot : (Maybe String -> msg) -> Sub msg
+
+type Msg = SetId (Maybe String)
+         | Socket String
          | ChangeInput String String
          | MouseOver String String
          | MouseOut String String
@@ -57,6 +63,7 @@ type Msg = Socket String
          | DragLeave String
          | Drop
          | SetStage Stage
+         | Reveal String String
 
 type alias SocketMsg =
     { id : String
@@ -79,29 +86,48 @@ socketMsgEncoder value =
         , ("args", Encode.list (List.map Encode.string value.args))
         ]
 
-sendAddCard connId columnId cardText =
+sendMsg msg =
     WebSocket.send "ws://localhost:8080/ws"
         <| Encode.encode 0
-        <| socketMsgEncoder
-        <| SocketMsg connId "add" [columnId, cardText]
+        <| socketMsgEncoder msg
+
+sendSetId connId =
+    SocketMsg connId "init" []
+        |> sendMsg
+
+sendGetId =
+    SocketMsg "" "init" []
+        |> sendMsg
+
+sendAddCard connId columnId cardText =
+    SocketMsg connId "add" [columnId, cardText]
+        |> sendMsg
 
 sendMoveCard connId columnFrom columnTo cardId =
-    WebSocket.send "ws://localhost:8080/ws"
-        <| Encode.encode 0
-        <| socketMsgEncoder
-        <| SocketMsg connId "move" [columnFrom, columnTo, cardId]
+    SocketMsg connId "move" [columnFrom, columnTo, cardId]
+        |> sendMsg
 
 sendSetStage connId stage =
-    WebSocket.send "ws://localhost:8080/ws"
-        <| Encode.encode 0
-        <| socketMsgEncoder
-        <| SocketMsg connId "stage" [toString stage]
+    SocketMsg connId "stage" [toString stage]
+        |> sendMsg
+
+sendReveal connId columnId cardId =
+    SocketMsg connId "reveal" [columnId, cardId]
+        |> sendMsg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        SetId id ->
+            case id of
+                Just v -> { model | id = v } ! [ sendSetId v ]
+                Nothing -> model ! [ sendGetId ]
+
         SetStage stage ->
             { model | stage = stage } ! [ sendSetStage model.id stage ]
+
+        Reveal columnId cardId ->
+            model ! [ sendReveal model.id columnId cardId ]
 
         MouseOver columnId cardId ->
             { model | cardOver = Just (columnId, cardId) } ! []
@@ -137,7 +163,11 @@ socketUpdate : SocketMsg -> Model -> (Model, Cmd Msg)
 socketUpdate msg model =
     case msg.op of
         "init" ->
-            { model | id = msg.id } ! []
+            case msg.args of
+                [connId] ->
+                    { model | id = connId } ! [ storageSet ("id", connId) ]
+                _ ->
+                    model ! []
 
         "stage" ->
             case msg.args of
@@ -156,7 +186,13 @@ socketUpdate msg model =
             case msg.args of
                 [columnId, cardId, cardText, cardRevealed] ->
                     let
-                        card = { id = cardId, author = model.id, votes = 0, text = cardText, revealed = cardRevealed == "true" }
+                        card =
+                            { id = cardId
+                            , author = msg.id
+                            , votes = 0
+                            , text = cardText
+                            , revealed = cardRevealed == "true"
+                            }
                     in
                         { model | retro = Retro.addCard columnId card model.retro } ! []
                 _ ->
@@ -179,6 +215,13 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
+        "reveal" ->
+            case msg.args of
+                [columnId, cardId] ->
+                    { model | retro = Retro.revealCard columnId cardId model.retro } ! []
+                _ ->
+                    model ! []
+
         _ ->
             model ! []
 
@@ -190,7 +233,7 @@ view model =
         [ Html.section [ Attr.class "section" ]
               [ Html.div [ Attr.class "container is-fluid" ]
                     [ tabsView model.stage
-                    , columnsView model.stage model.cardOver model.columnOver model.retro.columns
+                    , columnsView model.id model.stage model.cardOver model.columnOver model.retro.columns
                   ]
             ]
         , Html.footer [ Attr.class "footer" ]
@@ -226,17 +269,17 @@ tabsView stage =
                 ]
             ]
 
-columnsView : Stage -> Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
-columnsView stage cardOver columnOver columns =
+columnsView : String -> Stage -> Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
+columnsView connId stage cardOver columnOver columns =
     Bulma.columns [ ]
-        <| List.map (columnView stage cardOver columnOver)
+        <| List.map (columnView connId stage cardOver columnOver)
         <| Dict.toList columns
 
-columnView : Stage -> Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
-columnView stage cardOver columnOver (columnId, column) =
+columnView : String -> Stage -> Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
+columnView connId stage cardOver columnOver (columnId, column) =
     let
         title = [titleCardView column.name]
-        list = List.map (cardView stage cardOver columnId) (Dict.toList column.cards)
+        list = List.map (cardView connId stage cardOver columnId) (Dict.toList column.cards)
         add = [addCardView columnId]
     in
         case stage of
@@ -253,20 +296,35 @@ columnView stage cardOver columnOver (columnId, column) =
                 Html.div [ Attr.class "column" ]
                     (title ++ list)
 
-cardView : Stage -> Maybe (String, String) -> String -> (String, Card) -> Html Msg
-cardView stage cardOver columnId (cardId, card) =
+cardView : String -> Stage -> Maybe (String, String) -> String -> (String, Card) -> Html Msg
+cardView connId stage cardOver columnId (cardId, card) =
     case stage of
         Thinking ->
             Bulma.card [ Attr.draggable "true"
-                     , onDragStart (DragStart)
-                     , Event.onMouseOver (MouseOver columnId cardId)
-                     , Event.onMouseOut (MouseOut columnId cardId)
-                     ]
+                       , onDragStart (DragStart)
+                       , Event.onMouseOver (MouseOver columnId cardId)
+                       , Event.onMouseOut (MouseOut columnId cardId)
+                       , Attr.classList [ ("hidden", connId /= card.author) ]
+                       ]
                 [ Bulma.content [ Attr.classList [ ("over", cardOver == Just (columnId, cardId))
                                                  ]
                                 ]
-                      [ Html.text card.text ]
+                      [ Html.text card.text, Html.text connId, Html.text card.author ]
                 ]
+
+        Presenting ->
+            if not card.revealed then
+                Bulma.card [ Attr.classList [("not-revealed", not card.revealed)]
+                           , Event.onClick (Reveal columnId cardId)
+                           ]
+                    [ Bulma.content []
+                          [ Html.text card.text ]
+                    ]
+            else
+                Bulma.card []
+                    [ Bulma.content []
+                          [ Html.text card.text ]
+                    ]
 
         _ ->
             Bulma.card []
@@ -313,4 +371,7 @@ onDragStart tagger =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    WebSocket.listen "ws://localhost:8080/ws" Socket
+    Sub.batch
+        [ WebSocket.listen "ws://localhost:8080/ws" Socket
+        , storageGot SetId
+        ]
