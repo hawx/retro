@@ -1,7 +1,8 @@
 module Retro exposing (..)
 
 import Dict exposing (Dict)
-import Column exposing (Column, Card)
+import Column exposing (Column)
+import Card exposing (Card)
 
 type alias Retro =
     { columns : Dict String Column
@@ -30,6 +31,7 @@ addCard : String -> Card -> Retro -> Retro
 addCard columnId card retro =
     { retro | columns = Dict.update columnId (Maybe.map (Column.addCard card)) retro.columns }
 
+
 moveCard : String -> String -> String -> Retro -> Retro
 moveCard columnFrom columnTo cardId retro =
     let
@@ -39,3 +41,20 @@ moveCard columnFrom columnTo cardId retro =
             | columns = Dict.update columnTo (Maybe.map2 Column.addCard card)
               (Dict.update columnFrom (Maybe.map (Column.removeCard cardId)) retro.columns)
         }
+
+
+updateColumn : String -> (Column -> Column) -> Retro -> Retro
+updateColumn columnId f retro =
+    { retro | columns = Dict.update columnId (Maybe.map f) retro.columns }
+
+
+updateCard : String -> String -> (Card -> Card) -> Retro -> Retro
+updateCard columnId cardId f retro =
+    let
+        updateHelp column = Column.updateCard cardId f column
+    in
+        updateColumn columnId updateHelp retro
+
+revealCard : String -> String -> Retro -> Retro
+revealCard columnId cardId retro =
+    updateCard columnId cardId (\card -> { card | revealed = True }) retro

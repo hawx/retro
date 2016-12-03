@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Bulma
 import Debug
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -11,7 +12,8 @@ import WebSocket
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
-import Column exposing (Column, Card)
+import Column exposing (Column)
+import Card exposing (Card)
 import Retro exposing (Retro)
 
 main =
@@ -24,8 +26,12 @@ main =
 
 -- Model
 
+type Stage = Thinking | Presenting | Voting | Discussing
+
 type alias Model =
-    { id : String
+    { user : String
+    , joined : Bool
+    , stage : Stage
     , retro : Retro
     , input : String
     , cardOver : Maybe (String, String)
@@ -34,16 +40,23 @@ type alias Model =
 
 init : (Model, Cmd msg)
 init =
-    { id = ""
+    { user = ""
+    , joined = False
+    , stage = Thinking
     , retro = Retro.empty
     , input = ""
     , cardOver = Nothing
     , columnOver = Nothing
-    } ! []
+    } ! [ storageGet "id" ]
 
 -- Update
 
-type Msg = Socket String
+port storageSet : (String, String) -> Cmd msg
+port storageGet : String -> Cmd msg
+port storageGot : (Maybe String -> msg) -> Sub msg
+
+type Msg = SetId (Maybe String)
+         | Socket String
          | ChangeInput String String
          | MouseOver String String
          | MouseOut String String
@@ -51,6 +64,10 @@ type Msg = Socket String
          | DragOver String
          | DragLeave String
          | Drop
+         | SetStage Stage
+         | Reveal String String
+         | ChangeName String
+         | Join
 
 type alias SocketMsg =
     { id : String
@@ -73,21 +90,54 @@ socketMsgEncoder value =
         , ("args", Encode.list (List.map Encode.string value.args))
         ]
 
-sendAddCard connId columnId cardText =
+sendMsg msg =
     WebSocket.send "ws://localhost:8080/ws"
         <| Encode.encode 0
-        <| socketMsgEncoder
-        <| SocketMsg connId "add" [columnId, cardText]
+        <| socketMsgEncoder msg
+
+sendSetId connId =
+    SocketMsg connId "init" []
+        |> sendMsg
+
+sendGetId =
+    SocketMsg "" "init" []
+        |> sendMsg
+
+sendAddCard connId columnId cardText =
+    SocketMsg connId "add" [columnId, cardText]
+        |> sendMsg
 
 sendMoveCard connId columnFrom columnTo cardId =
-    WebSocket.send "ws://localhost:8080/ws"
-        <| Encode.encode 0
-        <| socketMsgEncoder
-        <| SocketMsg connId "move" [columnFrom, columnTo, cardId]
+    SocketMsg connId "move" [columnFrom, columnTo, cardId]
+        |> sendMsg
+
+sendSetStage connId stage =
+    SocketMsg connId "stage" [toString stage]
+        |> sendMsg
+
+sendReveal connId columnId cardId =
+    SocketMsg connId "reveal" [columnId, cardId]
+        |> sendMsg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        ChangeName name ->
+            { model | user = name } ! []
+        Join ->
+            { model | joined = True } ! [ sendSetId model.user ]
+
+        SetId id ->
+            case id of
+                Just v -> { model | user = v, joined = True } ! [ sendSetId v ]
+                Nothing -> model ! [ sendGetId ]
+
+        SetStage stage ->
+            { model | stage = stage } ! [ sendSetStage model.user stage ]
+
+        Reveal columnId cardId ->
+            model ! [ sendReveal model.user columnId cardId ]
+
         MouseOver columnId cardId ->
             { model | cardOver = Just (columnId, cardId) } ! []
         MouseOut columnId cardId ->
@@ -101,14 +151,14 @@ update msg model =
         Drop ->
             let
                 move (columnFrom, cardId) columnTo = { model | columnOver = Nothing , cardOver = Nothing
-                                                     } ! [ sendMoveCard model.id columnFrom columnTo cardId ]
+                                                     } ! [ sendMoveCard model.user columnFrom columnTo cardId ]
             in
                 Maybe.map2 move model.cardOver model.columnOver
                     |> Maybe.withDefault (model, Cmd.none)
 
         ChangeInput columnId input ->
             if String.contains "\n" input then
-                { model | input = "" } ! [ sendAddCard model.id columnId model.input ]
+                { model | input = "" } ! [ sendAddCard model.user columnId model.input ]
             else
                 { model | input = input } ! []
 
@@ -121,14 +171,30 @@ update msg model =
 socketUpdate : SocketMsg -> Model -> (Model, Cmd Msg)
 socketUpdate msg model =
     case msg.op of
-        "init" ->
-            { model | id = msg.id } ! []
+        "stage" ->
+            case msg.args of
+                [stage] ->
+                    case stage of
+                        "Thinking" -> { model | stage = Thinking } ! []
+                        "Presenting" -> { model | stage = Presenting } ! []
+                        "Voting" -> { model | stage = Voting } ! []
+                        "Discussing" -> { model | stage = Discussing } ! []
+                        _ -> model ! []
+
+                _ ->
+                    model ! []
 
         "add" ->
             case msg.args of
-                [columnId, cardId, cardText] ->
+                [columnId, cardId, cardText, cardRevealed] ->
                     let
-                        card = { id = cardId, author = model.id, votes = 0, text = cardText }
+                        card =
+                            { id = cardId
+                            , author = msg.id
+                            , votes = 0
+                            , text = cardText
+                            , revealed = cardRevealed == "true"
+                            }
                     in
                         { model | retro = Retro.addCard columnId card model.retro } ! []
                 _ ->
@@ -151,6 +217,13 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
+        "reveal" ->
+            case msg.args of
+                [columnId, cardId] ->
+                    { model | retro = Retro.revealCard columnId cardId model.retro } ! []
+                _ ->
+                    model ! []
+
         _ ->
             model ! []
 
@@ -158,84 +231,135 @@ socketUpdate msg model =
 
 view : Model -> Html Msg
 view model =
-    Html.div []
-        [ Html.section [ Attr.class "section" ]
-              [ Html.div [ Attr.class "container is-fluid" ]
-                    [ tabsView
-                    , columnsView model.cardOver model.columnOver model.retro.columns
-                  ]
-            ]
-        , Html.footer [ Attr.class "footer" ]
+    let
+        tabs =
+            Html.section [ Attr.class "section" ]
+                [ Html.div [ Attr.class "container is-fluid" ]
+                      [ tabsView model.stage
+                      , columnsView model.user model.stage model.cardOver model.columnOver model.retro.columns
+                      ]
+                ]
+
+        footer =
+          Html.footer [ Attr.class "footer" ]
             [ Html.div [ Attr.class "container" ]
                   [ Html.div [ Attr.class "content has-text-centered" ]
                         [ Html.text "A link to github?"
                         ]
                   ]
             ]
-        ]
 
-tabsView : Html Msg
-tabsView =
-    Html.div [ Attr.class "tabs is-toggle" ]
-        [ Html.ul [ Attr.class "is-left" ]
-              [ Html.li [ Attr.class "is-active" ]
-                    [ Html.a [] [ Html.text "Thinking" ]
-                    ]
-              , Html.li []
-                  [ Html.a [] [ Html.text "Presenting" ]
-                  ]
-              , Html.li []
-                  [ Html.a [] [ Html.text "Voting" ]
-                  ]
-              , Html.li []
-                  [ Html.a [] [ Html.text "Discussing" ]
-                  ]
-              ]
-        , Html.ul [ Attr.class "is-right" ]
-            [ Html.li []
-                  [ Html.a [] [ Html.text "05:03 remaining" ]
+        modal =
+          Bulma.modal
+            [ Bulma.box []
+                  [ Bulma.label "Name"
+                  , Bulma.input [ Event.onInput ChangeName ]
+                  , Bulma.button [ Attr.class "is-primary", Event.onClick Join ] [ Html.text "Join" ]
                   ]
             ]
-        ]
+    in
+        if model.joined then
+            Html.div [] [ tabs, footer ]
+        else
+            Html.div [] [ tabs, footer, modal ]
 
-columnsView : Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
-columnsView cardOver columnOver columns =
-    Html.div [ Attr.class "columns" ]
-        <| List.map (columnView cardOver columnOver)
+
+tabsView : Stage -> Html Msg
+tabsView stage =
+    let
+        tab s =
+            Html.li [ Attr.classList [("is-active", stage == s)]
+                    , Event.onClick (SetStage s)
+                    ]
+                [ Html.a [] [ Html.text (toString s) ]
+                ]
+    in
+        Bulma.tabs [ Attr.class "is-toggle" ]
+            [ Html.ul [ Attr.class "is-left" ]
+                  [ tab Thinking
+                  , tab Presenting
+                  , tab Voting
+                  , tab Discussing
+                  ]
+            , Html.ul [ Attr.class "is-right" ]
+                [ Html.li []
+                      [ Html.a [] [ Html.text "05:03 remaining" ]
+                      ]
+                ]
+            ]
+
+columnsView : String -> Stage -> Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
+columnsView connId stage cardOver columnOver columns =
+    Bulma.columns [ ]
+        <| List.map (columnView connId stage cardOver columnOver)
         <| Dict.toList columns
 
-columnView : Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
-columnView cardOver columnOver (columnId, column) =
+columnView : String -> Stage -> Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
+columnView connId stage cardOver columnOver (columnId, column) =
     let
-        a = [titleCardView column.name]
-        b = List.map (cardView cardOver columnId) (Dict.toList column.cards)
-        c = [addCardView columnId]
+        title = [titleCardView column.name]
+        list =
+            Dict.toList column.cards
+                |> List.map (cardView connId stage cardOver columnId)
+                |> List.concat
+        add = [addCardView columnId]
     in
-        Html.div [ Attr.classList [ ("column", True)
-                                  , ("over", columnOver == Just columnId)
-                                  ]
-                 , onDragOver (DragOver columnId)
-                 , onDragLeave (DragLeave columnId)
-                 , onDrop (Drop)
-                 ]
-            <| a ++ b ++ c
+        case stage of
+            Thinking ->
+                Bulma.column [ Attr.classList [ ("over", columnOver == Just columnId)
+                                              ]
+                             , onDragOver (DragOver columnId)
+                             , onDragLeave (DragLeave columnId)
+                             , onDrop (Drop)
+                             ]
+                    (title ++ list ++ add)
 
-cardView : Maybe (String, String) -> String -> (String, Card) -> Html Msg
-cardView cardOver columnId (cardId, card) =
-    Html.div [ Attr.class "card"
-             , Attr.draggable "true"
-             , onDragStart (DragStart)
-             , Event.onMouseOver (MouseOver columnId cardId)
-             , Event.onMouseOut (MouseOut columnId cardId)
-             ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.classList [ ("content", True)
-                                          , ("over", cardOver == Just (columnId, cardId))
-                                          ]
-                         ]
-                    [ Html.text card.text ]
-              ]
-        ]
+            _ ->
+                Html.div [ Attr.class "column" ]
+                    (title ++ list)
+
+cardView : String -> Stage -> Maybe (String, String) -> String -> (String, Card) -> List (Html Msg)
+cardView connId stage cardOver columnId (cardId, card) =
+    let
+        content =
+            Bulma.content []
+                [ Html.p [ Attr.class "title is-6" ] [ Html.text card.author ]
+                , Html.p [] [ Html.text card.text ]
+                ]
+    in
+        case stage of
+            Thinking ->
+                if connId == card.author then
+                    [ Bulma.card [ Attr.draggable "true"
+                                 , onDragStart (DragStart)
+                                 , Event.onMouseOver (MouseOver columnId cardId)
+                                 , Event.onMouseOut (MouseOut columnId cardId)
+                                 ]
+                          [ content ]
+                    ]
+                else
+                    []
+
+            Presenting ->
+                if not card.revealed then
+                    if connId == card.author then
+                        [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
+                                     , Event.onClick (Reveal columnId cardId)
+                                     ]
+                              [ content ]
+                        ]
+                    else
+                        []
+                else
+                    [ Bulma.card []
+                          [ content ]
+                    ]
+
+            _ ->
+                [ Bulma.card []
+                      [ content ]
+                ]
+
 
 titleCardView : String -> Html Msg
 titleCardView title =
@@ -249,11 +373,9 @@ titleCardView title =
 
 addCardView : String -> Html Msg
 addCardView columnId =
-    Html.div [ Attr.class "card" ]
-        [ Html.div [ Attr.class "card-content" ]
-              [ Html.div [ Attr.class "content" ]
-                    [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
-                    ]
+    Bulma.card []
+        [ Bulma.content []
+              [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
               ]
         ]
 
@@ -277,4 +399,7 @@ onDragStart tagger =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    WebSocket.listen "ws://localhost:8080/ws" Socket
+    Sub.batch
+        [ WebSocket.listen "ws://localhost:8080/ws" Socket
+        , storageGot SetId
+        ]
