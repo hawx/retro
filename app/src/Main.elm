@@ -279,7 +279,10 @@ columnView : String -> Stage -> Maybe (String, String) -> Maybe String -> (Strin
 columnView connId stage cardOver columnOver (columnId, column) =
     let
         title = [titleCardView column.name]
-        list = List.map (cardView connId stage cardOver columnId) (Dict.toList column.cards)
+        list =
+            Dict.toList column.cards
+                |> List.map (cardView connId stage cardOver columnId)
+                |> List.concat
         add = [addCardView columnId]
     in
         case stage of
@@ -296,41 +299,49 @@ columnView connId stage cardOver columnOver (columnId, column) =
                 Html.div [ Attr.class "column" ]
                     (title ++ list)
 
-cardView : String -> Stage -> Maybe (String, String) -> String -> (String, Card) -> Html Msg
+cardView : String -> Stage -> Maybe (String, String) -> String -> (String, Card) -> List (Html Msg)
 cardView connId stage cardOver columnId (cardId, card) =
     case stage of
         Thinking ->
-            Bulma.card [ Attr.draggable "true"
-                       , onDragStart (DragStart)
-                       , Event.onMouseOver (MouseOver columnId cardId)
-                       , Event.onMouseOut (MouseOut columnId cardId)
-                       , Attr.classList [ ("hidden", connId /= card.author) ]
-                       ]
-                [ Bulma.content [ Attr.classList [ ("over", cardOver == Just (columnId, cardId))
-                                                 ]
-                                ]
-                      [ Html.text card.text, Html.text connId, Html.text card.author ]
+            if connId == card.author then
+                [ Bulma.card [ Attr.draggable "true"
+                             , onDragStart (DragStart)
+                             , Event.onMouseOver (MouseOver columnId cardId)
+                             , Event.onMouseOut (MouseOut columnId cardId)
+                             ]
+                      [ Bulma.content []
+                            [ Html.text card.text ]
+                      ]
                 ]
+            else
+                []
 
         Presenting ->
             if not card.revealed then
-                Bulma.card [ Attr.classList [("not-revealed", not card.revealed)]
-                           , Event.onClick (Reveal columnId cardId)
-                           ]
-                    [ Bulma.content []
-                          [ Html.text card.text ]
+                if connId == card.author then
+                    [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
+                                 , Attr.class "mine"
+                                 , Event.onClick (Reveal columnId cardId)
+                                 ]
+                          [ Bulma.content []
+                                [ Html.text card.text ]
+                          ]
                     ]
+                else
+                    []
             else
-                Bulma.card []
+                [ Bulma.card [ Attr.classList [("mine", connId == card.author)] ]
                     [ Bulma.content []
                           [ Html.text card.text ]
                     ]
+                ]
 
         _ ->
-            Bulma.card []
+            [ Bulma.card [ Attr.classList [("mine", connId == card.author)] ]
                 [ Bulma.content []
                       [ Html.text card.text ]
                 ]
+            ]
 
 
 titleCardView : String -> Html Msg
