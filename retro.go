@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"hawx.me/code/retro/sock"
+
 	"github.com/google/uuid"
 	"golang.org/x/net/websocket"
 )
@@ -22,17 +24,15 @@ type msg struct {
 
 type Retro struct {
 	stage string
+	hub   *sock.Hub
 	// mu, pls
-	userMap map[string]string
 	columns map[string]*Column
-	conns   map[string]*websocket.Conn
 }
 
 func NewRetro() *Retro {
 	return &Retro{
-		userMap: map[string]string{},
+		hub:     sock.NewHub(),
 		columns: map[string]*Column{},
-		conns:   map[string]*websocket.Conn{},
 	}
 }
 
@@ -68,12 +68,6 @@ type Card struct {
 	revealed bool
 }
 
-func (r *Retro) broadcast(data msg) {
-	for _, conn := range r.conns {
-		websocket.JSON.Send(conn, data)
-	}
-}
-
 func boolToString(b bool) string {
 	if b {
 		return "true"
@@ -82,8 +76,7 @@ func boolToString(b bool) string {
 }
 
 func (r *Retro) websocketHandler(ws *websocket.Conn) {
-	connId := strId()
-	r.conns[connId] = ws
+	connId := r.hub.AddConnection(ws)
 
 	for {
 		var data msg
@@ -94,8 +87,6 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 			return
 		}
 
-		log.Println(data)
-
 		switch data.Op {
 		case "init":
 			if len(data.Args) == 0 {
@@ -104,56 +95,52 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 					userId = strId()
 				}
 
-				r.userMap[connId] = userId
+				r.hub.NameConnection(connId, userId)
 
-				r.initOp(ws, userId)
+				r.initOp(r.hub.Get(connId))
 			}
 
 		case "add":
 			if len(data.Args) == 2 {
 				columnId, cardText := data.Args[0], data.Args[1]
-				userId := r.userMap[connId]
 
-				r.addOp(ws, userId, columnId, cardText)
+				r.addOp(r.hub.Get(connId), columnId, cardText)
 			}
 
 		case "move":
 			if len(data.Args) == 3 {
 				columnFrom, columnTo, cardId := data.Args[0], data.Args[1], data.Args[2]
-				userId := r.userMap[connId]
 
-				r.moveOp(ws, userId, columnFrom, columnTo, cardId)
+				r.moveOp(r.hub.Get(connId), columnFrom, columnTo, cardId)
 			}
 
 		case "stage":
 			if len(data.Args) == 1 {
 				stage := data.Args[0]
-				userId := r.userMap[connId]
 
-				r.stageOp(ws, userId, stage)
+				r.stageOp(r.hub.Get(connId), stage)
 			}
 
 		case "reveal":
 			if len(data.Args) == 2 {
 				// this really shouldn't take columnId...
 				columnId, cardId := data.Args[0], data.Args[1]
-				userId := r.userMap[connId]
 
-				r.revealOp(ws, userId, columnId, cardId)
+				r.revealOp(r.hub.Get(connId), columnId, cardId)
 			}
 		}
 	}
 }
 
-func (r *Retro) initOp(ws *websocket.Conn, userId string) {
-	websocket.JSON.Send(ws, msg{
+func (r *Retro) initOp(conn *sock.Conn) {
+	conn.Send(sock.Msg{
 		Id:   "",
 		Op:   "init",
-		Args: []string{userId},
+		Args: []string{conn.Name},
 	})
 
 	if r.stage != "" {
-		websocket.JSON.Send(ws, msg{
+		conn.Send(sock.Msg{
 			Id:   "",
 			Op:   "stage",
 			Args: []string{r.stage},
@@ -161,14 +148,14 @@ func (r *Retro) initOp(ws *websocket.Conn, userId string) {
 	}
 
 	for columnId, column := range r.columns {
-		websocket.JSON.Send(ws, msg{
+		conn.Send(sock.Msg{
 			Id:   "",
 			Op:   "column",
 			Args: []string{columnId, column.name},
 		})
 
 		for cardId, card := range column.cards {
-			websocket.JSON.Send(ws, msg{
+			conn.Send(sock.Msg{
 				Id:   card.author,
 				Op:   "add",
 				Args: []string{columnId, cardId, card.text, boolToString(card.revealed)},
@@ -177,46 +164,46 @@ func (r *Retro) initOp(ws *websocket.Conn, userId string) {
 	}
 }
 
-func (r *Retro) addOp(ws *websocket.Conn, userId, columnId, cardText string) {
+func (r *Retro) addOp(conn *sock.Conn, columnId, cardText string) {
 	cardId := r.columns[columnId].AddCard(&Card{
 		text:     cardText,
-		author:   userId,
+		author:   conn.Name,
 		revealed: false,
 	})
 
-	r.broadcast(msg{
-		Id:   userId,
+	conn.Broadcast(sock.Msg{
+		Id:   conn.Name,
 		Op:   "add",
 		Args: []string{columnId, cardId, cardText, boolToString(false)},
 	})
 }
 
-func (r *Retro) moveOp(ws *websocket.Conn, userId, columnFrom, columnTo, cardId string) {
+func (r *Retro) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
 	r.columns[columnTo].cards[cardId] = r.columns[columnFrom].cards[cardId]
 	delete(r.columns[columnFrom].cards, cardId)
 
-	r.broadcast(msg{
-		Id:   userId,
+	conn.Broadcast(sock.Msg{
+		Id:   conn.Name,
 		Op:   "move",
 		Args: []string{columnFrom, columnTo, cardId},
 	})
 }
 
-func (r *Retro) stageOp(ws *websocket.Conn, userId, stage string) {
+func (r *Retro) stageOp(conn *sock.Conn, stage string) {
 	r.stage = stage
 
-	r.broadcast(msg{
-		Id:   userId,
+	conn.Broadcast(sock.Msg{
+		Id:   conn.Name,
 		Op:   "stage",
 		Args: []string{stage},
 	})
 }
 
-func (r *Retro) revealOp(ws *websocket.Conn, userId, columnId, cardId string) {
+func (r *Retro) revealOp(conn *sock.Conn, columnId, cardId string) {
 	r.columns[columnId].cards[cardId].revealed = true
 
-	r.broadcast(msg{
-		Id:   userId,
+	conn.Broadcast(sock.Msg{
+		Id:   conn.Name,
 		Op:   "reveal",
 		Args: []string{columnId, cardId},
 	})
