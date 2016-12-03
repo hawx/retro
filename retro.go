@@ -25,15 +25,19 @@ type msg struct {
 type Retro struct {
 	stage string
 	hub   *sock.Hub
+	mux   *sock.Mux
 	// mu, pls
 	columns map[string]*Column
 }
 
 func NewRetro() *Retro {
-	return &Retro{
+	r := &Retro{
 		hub:     sock.NewHub(),
 		columns: map[string]*Column{},
 	}
+	r.mux = retroMux(r)
+
+	return r
 }
 
 func (r *Retro) AddColumn(column *Column) string {
@@ -76,60 +80,59 @@ func boolToString(b bool) string {
 }
 
 func (r *Retro) websocketHandler(ws *websocket.Conn) {
-	connId := r.hub.AddConnection(ws)
+	conn := r.hub.AddConnection(ws)
+	defer r.hub.RemoveConnection(conn)
 
-	for {
-		var data msg
-		if err := websocket.JSON.Receive(ws, &data); err != nil {
-			if err != io.EOF {
-				log.Println(err)
-			}
-			return
-		}
-
-		switch data.Op {
-		case "init":
-			if len(data.Args) == 0 {
-				userId := data.Id
-				if userId == "" {
-					userId = strId()
-				}
-
-				r.hub.NameConnection(connId, userId)
-
-				r.initOp(r.hub.Get(connId))
-			}
-
-		case "add":
-			if len(data.Args) == 2 {
-				columnId, cardText := data.Args[0], data.Args[1]
-
-				r.addOp(r.hub.Get(connId), columnId, cardText)
-			}
-
-		case "move":
-			if len(data.Args) == 3 {
-				columnFrom, columnTo, cardId := data.Args[0], data.Args[1], data.Args[2]
-
-				r.moveOp(r.hub.Get(connId), columnFrom, columnTo, cardId)
-			}
-
-		case "stage":
-			if len(data.Args) == 1 {
-				stage := data.Args[0]
-
-				r.stageOp(r.hub.Get(connId), stage)
-			}
-
-		case "reveal":
-			if len(data.Args) == 2 {
-				// this really shouldn't take columnId...
-				columnId, cardId := data.Args[0], data.Args[1]
-
-				r.revealOp(r.hub.Get(connId), columnId, cardId)
-			}
-		}
+	if err := r.mux.Serve(conn); err != io.EOF {
+		log.Println(err)
 	}
+}
+
+func retroMux(r *Retro) *sock.Mux {
+	mux := sock.NewMux()
+
+	mux.Handle("init", func(conn *sock.Conn, args []string) {
+		if len(args) == 1 {
+			conn.Name = args[0]
+
+			r.initOp(conn)
+		}
+	})
+
+	mux.Handle("add", func(conn *sock.Conn, args []string) {
+		if len(args) == 2 {
+			columnId, cardText := args[0], args[1]
+
+			r.addOp(conn, columnId, cardText)
+		}
+	})
+
+	mux.Handle("move", func(conn *sock.Conn, args []string) {
+		if len(args) == 3 {
+			columnFrom, columnTo, cardId := args[0], args[1], args[2]
+
+			r.moveOp(conn, columnFrom, columnTo, cardId)
+		}
+	})
+
+	mux.Handle("stage", func(conn *sock.Conn, args []string) {
+		if len(args) == 1 {
+			stage := args[0]
+
+			r.stageOp(conn, stage)
+		}
+	})
+
+	mux.Handle("reveal", func(conn *sock.Conn, args []string) {
+		if len(args) == 2 {
+			// this really shouldn't take columnId...
+			columnId, cardId := args[0], args[1]
+
+			r.revealOp(conn, columnId, cardId)
+		}
+	})
+
+	return mux
 }
 
 func (r *Retro) initOp(conn *sock.Conn) {

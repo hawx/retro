@@ -96,11 +96,7 @@ sendMsg msg =
         <| socketMsgEncoder msg
 
 sendSetId connId =
-    SocketMsg connId "init" []
-        |> sendMsg
-
-sendGetId =
-    SocketMsg "" "init" []
+    SocketMsg connId "init" [connId]
         |> sendMsg
 
 sendAddCard connId columnId cardText =
@@ -130,7 +126,7 @@ update msg model =
         SetId id ->
             case id of
                 Just v -> { model | user = v, joined = True } ! [ sendSetId v ]
-                Nothing -> model ! [ sendGetId ]
+                Nothing -> model ! [ ]
 
         SetStage stage ->
             { model | stage = stage } ! [ sendSetStage model.user stage ]
