@@ -29,8 +29,7 @@ main =
 type Stage = Thinking | Presenting | Voting | Discussing
 
 type alias Model =
-    { id : String
-    , user : String
+    { user : String
     , joined : Bool
     , stage : Stage
     , retro : Retro
@@ -41,8 +40,7 @@ type alias Model =
 
 init : (Model, Cmd msg)
 init =
-    { id = ""
-    , user = ""
+    { user = ""
     , joined = False
     , stage = Thinking
     , retro = Retro.empty
@@ -135,10 +133,10 @@ update msg model =
                 Nothing -> model ! [ sendGetId ]
 
         SetStage stage ->
-            { model | stage = stage } ! [ sendSetStage model.id stage ]
+            { model | stage = stage } ! [ sendSetStage model.user stage ]
 
         Reveal columnId cardId ->
-            model ! [ sendReveal model.id columnId cardId ]
+            model ! [ sendReveal model.user columnId cardId ]
 
         MouseOver columnId cardId ->
             { model | cardOver = Just (columnId, cardId) } ! []
@@ -153,14 +151,14 @@ update msg model =
         Drop ->
             let
                 move (columnFrom, cardId) columnTo = { model | columnOver = Nothing , cardOver = Nothing
-                                                     } ! [ sendMoveCard model.id columnFrom columnTo cardId ]
+                                                     } ! [ sendMoveCard model.user columnFrom columnTo cardId ]
             in
                 Maybe.map2 move model.cardOver model.columnOver
                     |> Maybe.withDefault (model, Cmd.none)
 
         ChangeInput columnId input ->
             if String.contains "\n" input then
-                { model | input = "" } ! [ sendAddCard model.id columnId model.input ]
+                { model | input = "" } ! [ sendAddCard model.user columnId model.input ]
             else
                 { model | input = input } ! []
 
@@ -173,13 +171,6 @@ update msg model =
 socketUpdate : SocketMsg -> Model -> (Model, Cmd Msg)
 socketUpdate msg model =
     case msg.op of
-        "init" ->
-            case msg.args of
-                [connId] ->
-                    { model | id = connId } ! [ storageSet ("id", connId) ]
-                _ ->
-                    model ! []
-
         "stage" ->
             case msg.args of
                 [stage] ->
@@ -245,7 +236,7 @@ view model =
             Html.section [ Attr.class "section" ]
                 [ Html.div [ Attr.class "container is-fluid" ]
                       [ tabsView model.stage
-                      , columnsView model.id model.stage model.cardOver model.columnOver model.retro.columns
+                      , columnsView model.user model.stage model.cardOver model.columnOver model.retro.columns
                       ]
                 ]
 

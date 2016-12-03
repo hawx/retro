@@ -133,12 +133,6 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 }
 
 func (r *Retro) initOp(conn *sock.Conn) {
-	conn.Send(sock.Msg{
-		Id:   "",
-		Op:   "init",
-		Args: []string{conn.Name},
-	})
-
 	if r.stage != "" {
 		conn.Send(sock.Msg{
 			Id:   "",
