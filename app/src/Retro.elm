@@ -31,6 +31,9 @@ addCard : String -> Card -> Retro -> Retro
 addCard columnId card retro =
     { retro | columns = Dict.update columnId (Maybe.map (Column.addCard card)) retro.columns }
 
+removeCard : String -> String -> Retro -> Retro
+removeCard columnId cardId retro =
+    updateColumn columnId (Column.removeCard cardId) retro
 
 moveCard : String -> String -> String -> Retro -> Retro
 moveCard columnFrom columnTo cardId retro =
@@ -62,3 +65,21 @@ revealCard columnId cardId =
 addContent : String -> String -> Content -> Retro -> Retro
 addContent columnId cardId content =
     updateCard columnId cardId (\card -> { card | contents = card.contents ++ [content] })
+
+groupCards : (String, String) -> (String, String) -> Retro -> Retro
+groupCards (columnFrom, cardFrom) (columnTo, cardTo) retro =
+    let
+        from = getCard columnFrom cardFrom retro
+        updateHelp x b =
+            case x of
+                Just a ->
+                    { b | votes = a.votes + b.votes
+                    , revealed = a.revealed || b.revealed
+                    , contents = List.concat [a.contents, b.contents]
+                    }
+                Nothing ->
+                    b
+    in
+        retro
+            |> removeCard columnFrom cardFrom
+            |> updateCard columnTo cardTo (updateHelp from)

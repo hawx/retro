@@ -260,6 +260,13 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
+        "group" ->
+            case msg.args of
+                [columnFrom, cardFrom, columnTo, cardTo] ->
+                    { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
+                _ ->
+                    model ! []
+
         _ ->
             model ! []
 
