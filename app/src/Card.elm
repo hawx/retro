@@ -1,9 +1,20 @@
-module Card exposing (Card)
+module Card exposing (Card
+                     , authored
+                     , Content)
 
 type alias Card =
     { id : String
-    , text : String
     , votes : Int
-    , author : String
     , revealed : Bool
+    , contents : List Content
     }
+
+type alias Content =
+    { id : String
+    , text : String
+    , author : String
+    }
+
+authored : String -> Card -> Bool
+authored author card =
+    List.any (\x -> x.author == author) card.contents

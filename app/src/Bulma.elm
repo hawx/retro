@@ -24,11 +24,20 @@ column attrs =
     Html.div ([ Attr.class "column" ] ++ attrs)
 
 card : List (Html.Attribute msg) -> List (Html msg) -> Html msg
-card attrs body =
+card attrs =
     Html.div ([ Attr.class "card" ] ++ attrs)
-        [ Html.div [ Attr.class "card-content" ]
-              body
-        ]
+
+cardContent : List (Html.Attribute msg) -> List (Html msg) -> Html msg
+cardContent attrs =
+    Html.div ([ Attr.class "card-content" ] ++ attrs)
+
+cardFooter : List (Html.Attribute msg) -> List (Html msg) -> Html msg
+cardFooter attrs =
+    Html.footer ([ Attr.class "card-footer" ] ++ attrs)
+
+cardFooterItem : List (Html.Attribute msg) -> String -> Html msg
+cardFooterItem attrs name =
+    Html.a ([ Attr.class "card-footer-item" ] ++ attrs) [ Html.text name ]
 
 content : List (Html.Attribute msg) -> List (Html msg) -> Html msg
 content attrs =
