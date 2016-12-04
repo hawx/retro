@@ -2,7 +2,7 @@ module Retro exposing (..)
 
 import Dict exposing (Dict)
 import Column exposing (Column)
-import Card exposing (Card)
+import Card exposing (Card, Content)
 
 type alias Retro =
     { columns : Dict String Column
@@ -49,12 +49,16 @@ updateColumn columnId f retro =
 
 
 updateCard : String -> String -> (Card -> Card) -> Retro -> Retro
-updateCard columnId cardId f retro =
+updateCard columnId cardId f  =
     let
         updateHelp column = Column.updateCard cardId f column
     in
-        updateColumn columnId updateHelp retro
+        updateColumn columnId updateHelp
 
 revealCard : String -> String -> Retro -> Retro
-revealCard columnId cardId retro =
-    updateCard columnId cardId (\card -> { card | revealed = True }) retro
+revealCard columnId cardId =
+    updateCard columnId cardId (\card -> { card | revealed = True })
+
+addContent : String -> String -> Content -> Retro -> Retro
+addContent columnId cardId content =
+    updateCard columnId cardId (\card -> { card | contents = card.contents ++ [content] })

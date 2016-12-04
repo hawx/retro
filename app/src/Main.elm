@@ -207,22 +207,32 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
-        "add" ->
+        "card" ->
             case msg.args of
-                [columnId, cardId, cardText, cardRevealed] ->
+                [columnId, cardId, cardRevealed] ->
                     let
                         card =
                             { id = cardId
                             , votes = 0
                             , revealed = cardRevealed == "true"
-                            , contents = [ { id = cardId
-                                           , text = cardText
-                                           , author = msg.id
-                                           }
-                                         ]
+                            , contents = [ ]
                             }
                     in
                         { model | retro = Retro.addCard columnId card model.retro } ! []
+                _ ->
+                    model ! []
+
+        "content" ->
+            case msg.args of
+                [columnId, cardId, _, contentText] ->
+                    let content =
+                            { id = ""
+                            , text = contentText
+                            , author = msg.id
+                            }
+                    in
+                        { model | retro = Retro.addContent columnId cardId content model.retro } ! []
+
                 _ ->
                     model ! []
 
