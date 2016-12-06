@@ -66,10 +66,14 @@ func (c *Column) AddCard(card *Card) string {
 }
 
 type Card struct {
-	text     string
 	votes    int
-	author   string
 	revealed bool
+	contents []Content
+}
+
+type Content struct {
+	text   string
+	author string
 }
 
 func boolToString(b bool) string {
@@ -132,6 +136,14 @@ func retroMux(r *Retro) *sock.Mux {
 		}
 	})
 
+	mux.Handle("group", func(conn *sock.Conn, args []string) {
+		if len(args) == 4 {
+			columnFrom, cardFrom, columnTo, cardTo := args[0], args[1], args[2], args[3]
+
+			r.groupOp(conn, columnFrom, cardFrom, columnTo, cardTo)
+		}
+	})
+
 	return mux
 }
 
@@ -153,25 +165,44 @@ func (r *Retro) initOp(conn *sock.Conn) {
 
 		for cardId, card := range column.cards {
 			conn.Send(sock.Msg{
-				Id:   card.author,
-				Op:   "add",
-				Args: []string{columnId, cardId, card.text, boolToString(card.revealed)},
+				Id:   "",
+				Op:   "card",
+				Args: []string{columnId, cardId, boolToString(card.revealed)},
 			})
+
+			for contentIndex, content := range card.contents {
+				conn.Send(sock.Msg{
+					Id:   content.author,
+					Op:   "content",
+					Args: []string{columnId, cardId, string(contentIndex), content.text},
+				})
+			}
 		}
 	}
 }
 
 func (r *Retro) addOp(conn *sock.Conn, columnId, cardText string) {
+	content := Content{
+		text:   cardText,
+		author: conn.Name,
+	}
+
 	cardId := r.columns[columnId].AddCard(&Card{
-		text:     cardText,
-		author:   conn.Name,
+		votes:    0,
 		revealed: false,
+		contents: []Content{content},
 	})
 
 	conn.Broadcast(sock.Msg{
-		Id:   conn.Name,
-		Op:   "add",
-		Args: []string{columnId, cardId, cardText, boolToString(false)},
+		Id:   "",
+		Op:   "card",
+		Args: []string{columnId, cardId, boolToString(false)},
+	})
+
+	conn.Broadcast(sock.Msg{
+		Id:   content.author,
+		Op:   "content",
+		Args: []string{columnId, cardId, string(0), content.text},
 	})
 }
 
@@ -203,6 +234,19 @@ func (r *Retro) revealOp(conn *sock.Conn, columnId, cardId string) {
 		Id:   conn.Name,
 		Op:   "reveal",
 		Args: []string{columnId, cardId},
+	})
+}
+
+func (r *Retro) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo string) {
+	from := r.columns[columnFrom].cards[cardFrom]
+	to := r.columns[columnTo].cards[cardTo]
+
+	to.contents = append(to.contents, from.contents...)
+
+	conn.Broadcast(sock.Msg{
+		Id:   conn.Name,
+		Op:   "group",
+		Args: []string{columnFrom, cardFrom, columnTo, cardTo},
 	})
 }
 

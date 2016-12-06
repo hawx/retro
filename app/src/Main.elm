@@ -13,7 +13,7 @@ import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Json.Encode as Encode
 import Column exposing (Column)
-import Card exposing (Card)
+import Card exposing (Card, Content)
 import Retro exposing (Retro)
 
 main =
@@ -28,14 +28,17 @@ main =
 
 type Stage = Thinking | Presenting | Voting | Discussing
 
+type alias CardDragging = Maybe (String, String)
+type alias CardOver = Maybe (String, Maybe String)
+
 type alias Model =
     { user : String
     , joined : Bool
     , stage : Stage
     , retro : Retro
     , input : String
-    , cardOver : Maybe (String, String)
-    , columnOver : Maybe String
+    , cardDragging : CardDragging
+    , cardOver : CardOver
     }
 
 init : (Model, Cmd msg)
@@ -45,8 +48,8 @@ init =
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
+    , cardDragging = Nothing
     , cardOver = Nothing
-    , columnOver = Nothing
     } ! [ storageGet "id" ]
 
 -- Update
@@ -61,8 +64,8 @@ type Msg = SetId (Maybe String)
          | MouseOver String String
          | MouseOut String String
          | DragStart
-         | DragOver String
-         | DragLeave String
+         | DragOver (String, Maybe String)
+         | DragLeave (String, Maybe String)
          | Drop
          | SetStage Stage
          | Reveal String String
@@ -115,6 +118,10 @@ sendReveal connId columnId cardId =
     SocketMsg connId "reveal" [columnId, cardId]
         |> sendMsg
 
+sendGroupCards connId columnFrom cardFrom columnTo cardTo =
+    SocketMsg connId "group" [columnFrom, cardFrom, columnTo, cardTo]
+        |> sendMsg
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
@@ -135,22 +142,42 @@ update msg model =
             model ! [ sendReveal model.user columnId cardId ]
 
         MouseOver columnId cardId ->
-            { model | cardOver = Just (columnId, cardId) } ! []
+            { model | cardDragging = Just (columnId, cardId) } ! []
         MouseOut columnId cardId ->
-            { model | cardOver = Nothing } ! []
+            { model | cardDragging = Nothing } ! []
 
         DragStart -> model ! []
-        DragOver columnId ->
-            { model | columnOver = Just columnId } ! []
+        DragOver over ->
+            { model | cardOver = Just over } ! []
         DragLeave _ ->
-            { model | columnOver = Nothing } ! []
+            { model | cardOver = Nothing } ! []
         Drop ->
-            let
-                move (columnFrom, cardId) columnTo = { model | columnOver = Nothing , cardOver = Nothing
-                                                     } ! [ sendMoveCard model.user columnFrom columnTo cardId ]
-            in
-                Maybe.map2 move model.cardOver model.columnOver
-                    |> Maybe.withDefault (model, Cmd.none)
+            case model.stage of
+                Thinking ->
+                    let
+                        move (columnFrom, cardId) (columnTo, _) = { model
+                                                                      | cardOver = Nothing
+                                                                      , cardDragging = Nothing
+                                                                  } ! [ sendMoveCard model.user columnFrom columnTo cardId ]
+                    in
+                        Maybe.map2 move model.cardDragging model.cardOver
+                            |> Maybe.withDefault (model, Cmd.none)
+
+                Voting ->
+                    let
+                        move (columnFrom, cardFrom) (columnTo, maybeCardTo) =
+                            case maybeCardTo of
+                                Just cardTo -> { model
+                                                   | cardOver = Nothing
+                                                   , cardDragging = Nothing
+                                               } ! [ sendGroupCards model.user columnFrom cardFrom columnTo cardTo ]
+                                Nothing -> (model, Cmd.none)
+                    in
+                        Maybe.map2 move model.cardDragging model.cardOver
+                            |> Maybe.withDefault (model, Cmd.none)
+
+                _ ->
+                    (model, Cmd.none)
 
         ChangeInput columnId input ->
             if String.contains "\n" input then
@@ -180,19 +207,32 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
-        "add" ->
+        "card" ->
             case msg.args of
-                [columnId, cardId, cardText, cardRevealed] ->
+                [columnId, cardId, cardRevealed] ->
                     let
                         card =
                             { id = cardId
-                            , author = msg.id
                             , votes = 0
-                            , text = cardText
                             , revealed = cardRevealed == "true"
+                            , contents = [ ]
                             }
                     in
                         { model | retro = Retro.addCard columnId card model.retro } ! []
+                _ ->
+                    model ! []
+
+        "content" ->
+            case msg.args of
+                [columnId, cardId, _, contentText] ->
+                    let content =
+                            { id = ""
+                            , text = contentText
+                            , author = msg.id
+                            }
+                    in
+                        { model | retro = Retro.addContent columnId cardId content model.retro } ! []
+
                 _ ->
                     model ! []
 
@@ -220,6 +260,13 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
+        "group" ->
+            case msg.args of
+                [columnFrom, cardFrom, columnTo, cardTo] ->
+                    { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
+                _ ->
+                    model ! []
+
         _ ->
             model ! []
 
@@ -232,7 +279,7 @@ view model =
             Html.section [ Attr.class "section" ]
                 [ Html.div [ Attr.class "container is-fluid" ]
                       [ tabsView model.stage
-                      , columnsView model.user model.stage model.cardOver model.columnOver model.retro.columns
+                      , columnsView model.user model.stage model.cardDragging model.cardOver model.retro.columns
                       ]
                 ]
 
@@ -284,28 +331,28 @@ tabsView stage =
                 ]
             ]
 
-columnsView : String -> Stage -> Maybe (String, String) -> Maybe String -> Dict String Column -> Html Msg
-columnsView connId stage cardOver columnOver columns =
+columnsView : String -> Stage -> CardDragging -> CardOver -> Dict String Column -> Html Msg
+columnsView connId stage cardDragging cardOver columns =
     Bulma.columns [ ]
-        <| List.map (columnView connId stage cardOver columnOver)
+        <| List.map (columnView connId stage cardDragging cardOver)
         <| Dict.toList columns
 
-columnView : String -> Stage -> Maybe (String, String) -> Maybe String -> (String, Column) -> Html Msg
-columnView connId stage cardOver columnOver (columnId, column) =
+columnView : String -> Stage -> CardDragging -> CardOver -> (String, Column) -> Html Msg
+columnView connId stage cardDragging cardOver (columnId, column) =
     let
         title = [titleCardView column.name]
         list =
             Dict.toList column.cards
-                |> List.map (cardView connId stage cardOver columnId)
+                |> List.map (cardView connId stage cardDragging cardOver columnId)
                 |> List.concat
         add = [addCardView columnId]
     in
         case stage of
             Thinking ->
-                Bulma.column [ Attr.classList [ ("over", columnOver == Just columnId)
+                Bulma.column [ Attr.classList [ ("over", cardOver == Just (columnId, Nothing))
                                               ]
-                             , onDragOver (DragOver columnId)
-                             , onDragLeave (DragLeave columnId)
+                             , onDragOver (DragOver (columnId, Nothing))
+                             , onDragLeave (DragLeave (columnId, Nothing))
                              , onDrop (Drop)
                              ]
                     (title ++ list ++ add)
@@ -314,46 +361,75 @@ columnView connId stage cardOver columnOver (columnId, column) =
                 Html.div [ Attr.class "column" ]
                     (title ++ list)
 
-cardView : String -> Stage -> Maybe (String, String) -> String -> (String, Card) -> List (Html Msg)
-cardView connId stage cardOver columnId (cardId, card) =
+contentView : Content -> Html Msg
+contentView content =
+    Bulma.content []
+        [ Html.p [ Attr.class "title is-6" ] [ Html.text content.author ]
+        , Html.p [] [ Html.text content.text ]
+        ]
+
+contentsView : List Content -> Html Msg
+contentsView contents =
+    contents
+        |> List.map (contentView)
+        |> List.intersperse (Html.hr [] [])
+        |> Bulma.content []
+
+cardView : String -> Stage -> CardDragging -> CardOver -> String -> (String, Card) -> List (Html Msg)
+cardView connId stage cardDragging cardOver columnId (cardId, card) =
     let
-        content =
-            Bulma.content []
-                [ Html.p [ Attr.class "title is-6" ] [ Html.text card.author ]
-                , Html.p [] [ Html.text card.text ]
-                ]
+        content = contentsView card.contents
     in
         case stage of
             Thinking ->
-                if connId == card.author then
+                if Card.authored connId card then
                     [ Bulma.card [ Attr.draggable "true"
                                  , onDragStart (DragStart)
                                  , Event.onMouseOver (MouseOver columnId cardId)
                                  , Event.onMouseOut (MouseOut columnId cardId)
                                  ]
-                          [ content ]
+                          [ Bulma.cardContent [] [ content ] ]
                     ]
                 else
                     []
 
             Presenting ->
                 if not card.revealed then
-                    if connId == card.author then
+                    if Card.authored connId card then
                         [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
                                      , Event.onClick (Reveal columnId cardId)
                                      ]
-                              [ content ]
+                              [ Bulma.cardContent [] [ content ] ]
                         ]
                     else
                         []
                 else
                     [ Bulma.card []
-                          [ content ]
+                          [ Bulma.cardContent [] [ content ] ]
                     ]
+
+            Voting ->
+                [ Bulma.card [ Attr.draggable "true"
+                             , onDragStart (DragStart)
+                             , Event.onMouseOver (MouseOver columnId cardId)
+                             , Event.onMouseOut (MouseOut columnId cardId)
+                             , Attr.classList [ ("over", cardOver == Just (columnId, Just cardId))
+                                              ]
+                             , onDragOver (DragOver (columnId, Just cardId))
+                             , onDragLeave (DragOver (columnId, Just cardId))
+                             , onDrop (Drop)
+                             ]
+                      [ Bulma.cardContent []
+                            [ content ]
+                      , Bulma.cardFooter []
+                          [ Bulma.cardFooterItem [] "Vote"
+                          ]
+                      ]
+                ]
 
             _ ->
                 [ Bulma.card []
-                      [ content ]
+                      [ Bulma.cardContent [] [ content ] ]
                 ]
 
 
@@ -370,8 +446,10 @@ titleCardView title =
 addCardView : String -> Html Msg
 addCardView columnId =
     Bulma.card []
-        [ Bulma.content []
-              [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
+        [ Bulma.cardContent []
+              [ Bulma.content []
+                    [ Html.textarea [ Event.onInput (ChangeInput columnId), Attr.placeholder "Add a card..." ] [ ]
+                    ]
               ]
         ]
 
