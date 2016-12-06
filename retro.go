@@ -241,6 +241,7 @@ func (r *Retro) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo 
 	from := r.columns[columnFrom].cards[cardFrom]
 	to := r.columns[columnTo].cards[cardTo]
 
+	delete(r.columns[columnFrom].cards, cardFrom)
 	to.contents = append(to.contents, from.contents...)
 
 	conn.Broadcast(sock.Msg{
