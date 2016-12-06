@@ -60,6 +60,10 @@ revealCard : String -> String -> Retro -> Retro
 revealCard columnId cardId =
     updateCard columnId cardId (\card -> { card | revealed = True })
 
+voteCard : String -> String -> Retro -> Retro
+voteCard columnId cardId =
+    updateCard columnId cardId (\card -> { card | votes = card.votes + 1 })
+
 addContent : String -> String -> Content -> Retro -> Retro
 addContent columnId cardId content =
     updateCard columnId cardId (\card -> { card | contents = card.contents ++ [content] })

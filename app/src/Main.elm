@@ -71,6 +71,7 @@ type Msg = SetId (Maybe String)
          | Reveal String String
          | ChangeName String
          | Join
+         | Vote String String
 
 type alias SocketMsg =
     { id : String
@@ -93,53 +94,34 @@ socketMsgEncoder value =
         , ("args", Encode.list (List.map Encode.string value.args))
         ]
 
-sendMsg msg =
-    WebSocket.send "ws://localhost:8080/ws"
-        <| Encode.encode 0
-        <| socketMsgEncoder msg
-
-sendSetId connId =
-    SocketMsg connId "init" [connId]
-        |> sendMsg
-
-sendAddCard connId columnId cardText =
-    SocketMsg connId "add" [columnId, cardText]
-        |> sendMsg
-
-sendMoveCard connId columnFrom columnTo cardId =
-    SocketMsg connId "move" [columnFrom, columnTo, cardId]
-        |> sendMsg
-
-sendSetStage connId stage =
-    SocketMsg connId "stage" [toString stage]
-        |> sendMsg
-
-sendReveal connId columnId cardId =
-    SocketMsg connId "reveal" [columnId, cardId]
-        |> sendMsg
-
-sendGroupCards connId columnFrom cardFrom columnTo cardTo =
-    SocketMsg connId "group" [columnFrom, cardFrom, columnTo, cardTo]
-        |> sendMsg
+sendMsg : String -> String -> List String -> Cmd Msg
+sendMsg id op args =
+    SocketMsg id op args
+        |> socketMsgEncoder
+        |> Encode.encode 0
+        |> WebSocket.send "ws://localhost:8080/ws"
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        Vote columnId cardId ->
+            model ! [ sendMsg model.user "vote" [columnId, cardId] ]
+
         ChangeName name ->
             { model | user = name } ! []
         Join ->
-            { model | joined = True } ! [ sendSetId model.user ]
+            { model | joined = True } ! [ sendMsg model.user "init" [model.user] ]
 
         SetId id ->
             case id of
-                Just v -> { model | user = v, joined = True } ! [ sendSetId v ]
+                Just v -> { model | user = v, joined = True } ! [ sendMsg v "init" [v] ]
                 Nothing -> model ! [ ]
 
         SetStage stage ->
-            { model | stage = stage } ! [ sendSetStage model.user stage ]
+            { model | stage = stage } ! [ sendMsg model.user "stage" [toString stage] ]
 
         Reveal columnId cardId ->
-            model ! [ sendReveal model.user columnId cardId ]
+            model ! [ sendMsg model.user "reveal" [columnId, cardId] ]
 
         MouseOver columnId cardId ->
             { model | cardDragging = Just (columnId, cardId) } ! []
@@ -158,7 +140,7 @@ update msg model =
                         move (columnFrom, cardId) (columnTo, _) = { model
                                                                       | cardOver = Nothing
                                                                       , cardDragging = Nothing
-                                                                  } ! [ sendMoveCard model.user columnFrom columnTo cardId ]
+                                                                  } ! [ sendMsg model.user "move" [columnFrom, columnTo, cardId] ]
                     in
                         Maybe.map2 move model.cardDragging model.cardOver
                             |> Maybe.withDefault (model, Cmd.none)
@@ -170,7 +152,7 @@ update msg model =
                                 Just cardTo -> { model
                                                    | cardOver = Nothing
                                                    , cardDragging = Nothing
-                                               } ! [ sendGroupCards model.user columnFrom cardFrom columnTo cardTo ]
+                                               } ! [ sendMsg model.user "group" [columnFrom, cardFrom, columnTo, cardTo] ]
                                 Nothing -> (model, Cmd.none)
                     in
                         Maybe.map2 move model.cardDragging model.cardOver
@@ -181,7 +163,7 @@ update msg model =
 
         ChangeInput columnId input ->
             if String.contains "\n" input then
-                { model | input = "" } ! [ sendAddCard model.user columnId model.input ]
+                { model | input = "" } ! [ sendMsg model.user "add" [columnId, model.input] ]
             else
                 { model | input = input } ! []
 
@@ -264,6 +246,13 @@ socketUpdate msg model =
             case msg.args of
                 [columnFrom, cardFrom, columnTo, cardTo] ->
                     { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
+                _ ->
+                    model ! []
+
+        "vote" ->
+            case msg.args of
+                [columnId, cardId] ->
+                    { model | retro = Retro.voteCard columnId cardId model.retro } ! []
                 _ ->
                     model ! []
 
@@ -422,7 +411,8 @@ cardView connId stage cardDragging cardOver columnId (cardId, card) =
                       [ Bulma.cardContent []
                             [ content ]
                       , Bulma.cardFooter []
-                          [ Bulma.cardFooterItem [] "Vote"
+                          [ Bulma.cardFooterItem [] (toString card.votes)
+                          , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "Vote"
                           ]
                       ]
                 ]
