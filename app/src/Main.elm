@@ -71,6 +71,7 @@ type Msg = SetId (Maybe String)
          | Reveal String String
          | ChangeName String
          | Join
+         | Vote String String
 
 type alias SocketMsg =
     { id : String
@@ -122,9 +123,16 @@ sendGroupCards connId columnFrom cardFrom columnTo cardTo =
     SocketMsg connId "group" [columnFrom, cardFrom, columnTo, cardTo]
         |> sendMsg
 
+sendMsg2 : String -> String -> List String -> Cmd Msg
+sendMsg2 id op args =
+    sendMsg (SocketMsg id op args)
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        Vote columnId cardId ->
+            model ! [ sendMsg2 model.user "vote" [columnId, cardId] ]
+
         ChangeName name ->
             { model | user = name } ! []
         Join ->
@@ -264,6 +272,13 @@ socketUpdate msg model =
             case msg.args of
                 [columnFrom, cardFrom, columnTo, cardTo] ->
                     { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
+                _ ->
+                    model ! []
+
+        "vote" ->
+            case msg.args of
+                [columnId, cardId] ->
+                    { model | retro = Retro.voteCard columnId cardId model.retro } ! []
                 _ ->
                     model ! []
 
@@ -422,7 +437,8 @@ cardView connId stage cardDragging cardOver columnId (cardId, card) =
                       [ Bulma.cardContent []
                             [ content ]
                       , Bulma.cardFooter []
-                          [ Bulma.cardFooterItem [] "Vote"
+                          [ Bulma.cardFooterItem [] (toString card.votes)
+                          , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "Vote"
                           ]
                       ]
                 ]

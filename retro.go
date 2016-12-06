@@ -144,6 +144,14 @@ func retroMux(r *Retro) *sock.Mux {
 		}
 	})
 
+	mux.Handle("vote", func(conn *sock.Conn, args []string) {
+		if len(args) == 2 {
+			columnId, cardId := args[0], args[1]
+
+			r.voteOp(conn, columnId, cardId)
+		}
+	})
+
 	return mux
 }
 
@@ -248,6 +256,16 @@ func (r *Retro) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo 
 		Id:   conn.Name,
 		Op:   "group",
 		Args: []string{columnFrom, cardFrom, columnTo, cardTo},
+	})
+}
+
+func (r *Retro) voteOp(conn *sock.Conn, columnId, cardId string) {
+	r.columns[columnId].cards[cardId].votes += 1
+
+	conn.Broadcast(sock.Msg{
+		Id:   conn.Name,
+		Op:   "vote",
+		Args: []string{columnId, cardId},
 	})
 }
 
