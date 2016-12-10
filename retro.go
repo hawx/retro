@@ -5,9 +5,11 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/google/uuid"
+
+	"hawx.me/code/retro/models"
 	"hawx.me/code/retro/sock"
 
-	"github.com/google/uuid"
 	"golang.org/x/net/websocket"
 )
 
@@ -22,58 +24,22 @@ type msg struct {
 	Args []string `json:"args"`
 }
 
-type Retro struct {
+type Room struct {
 	stage string
 	hub   *sock.Hub
 	mux   *sock.Mux
-	// mu, pls
-	columns map[string]*Column
+	retro *models.Retro
 }
 
-func NewRetro() *Retro {
-	r := &Retro{
-		hub:     sock.NewHub(),
-		columns: map[string]*Column{},
+func NewRoom() *Room {
+	room := &Room{
+		hub:   sock.NewHub(),
+		retro: models.NewRetro(),
 	}
-	r.mux = retroMux(r)
 
-	return r
-}
+	room.mux = retroMux(room)
 
-func (r *Retro) AddColumn(column *Column) string {
-	id := strId()
-	r.columns[id] = column
-	return id
-}
-
-type Column struct {
-	name string
-	// mu pls
-	cards map[string]*Card
-}
-
-func NewColumn(name string) *Column {
-	return &Column{
-		name:  name,
-		cards: map[string]*Card{},
-	}
-}
-
-func (c *Column) AddCard(card *Card) string {
-	id := strId()
-	c.cards[id] = card
-	return id
-}
-
-type Card struct {
-	votes    int
-	revealed bool
-	contents []Content
-}
-
-type Content struct {
-	text   string
-	author string
+	return room
 }
 
 func boolToString(b bool) string {
@@ -83,7 +49,7 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func (r *Retro) websocketHandler(ws *websocket.Conn) {
+func (r *Room) websocketHandler(ws *websocket.Conn) {
 	conn := r.hub.AddConnection(ws)
 	defer r.hub.RemoveConnection(conn)
 
@@ -92,7 +58,7 @@ func (r *Retro) websocketHandler(ws *websocket.Conn) {
 	}
 }
 
-func retroMux(r *Retro) *sock.Mux {
+func retroMux(r *Room) *sock.Mux {
 	mux := sock.NewMux()
 
 	mux.Handle("init", func(conn *sock.Conn, args []string) {
@@ -155,7 +121,7 @@ func retroMux(r *Retro) *sock.Mux {
 	return mux
 }
 
-func (r *Retro) initOp(conn *sock.Conn) {
+func (r *Room) initOp(conn *sock.Conn) {
 	if r.stage != "" {
 		conn.Send(sock.Msg{
 			Id:   "",
@@ -164,59 +130,65 @@ func (r *Retro) initOp(conn *sock.Conn) {
 		})
 	}
 
-	for columnId, column := range r.columns {
+	for columnId, column := range r.retro.Columns() {
 		conn.Send(sock.Msg{
 			Id:   "",
 			Op:   "column",
-			Args: []string{columnId, column.name},
+			Args: []string{columnId, column.Name},
 		})
 
-		for cardId, card := range column.cards {
+		for cardId, card := range column.Cards() {
 			conn.Send(sock.Msg{
 				Id:   "",
 				Op:   "card",
-				Args: []string{columnId, cardId, boolToString(card.revealed)},
+				Args: []string{columnId, cardId, boolToString(card.Revealed)},
 			})
 
-			for contentIndex, content := range card.contents {
+			for contentIndex, content := range card.Contents() {
 				conn.Send(sock.Msg{
-					Id:   content.author,
+					Id:   content.Author,
 					Op:   "content",
-					Args: []string{columnId, cardId, string(contentIndex), content.text},
+					Args: []string{columnId, cardId, string(contentIndex), content.Text},
 				})
 			}
 		}
 	}
 }
 
-func (r *Retro) addOp(conn *sock.Conn, columnId, cardText string) {
-	content := Content{
-		text:   cardText,
-		author: conn.Name,
+func (r *Room) addOp(conn *sock.Conn, columnId, cardText string) {
+	content := models.Content{
+		Text:   cardText,
+		Author: conn.Name,
 	}
 
-	cardId := r.columns[columnId].AddCard(&Card{
-		votes:    0,
-		revealed: false,
-		contents: []Content{content},
-	})
+	card := &models.Card{
+		Id:       strId(),
+		Votes:    0,
+		Revealed: false,
+	}
+
+	card.Add(content)
+
+	r.retro.Get(columnId).Add(card)
 
 	conn.Broadcast(sock.Msg{
 		Id:   "",
 		Op:   "card",
-		Args: []string{columnId, cardId, boolToString(false)},
+		Args: []string{columnId, card.Id, boolToString(card.Revealed)},
 	})
 
 	conn.Broadcast(sock.Msg{
-		Id:   content.author,
+		Id:   content.Author,
 		Op:   "content",
-		Args: []string{columnId, cardId, string(0), content.text},
+		Args: []string{columnId, card.Id, string(0), content.Text},
 	})
 }
 
-func (r *Retro) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
-	r.columns[columnTo].cards[cardId] = r.columns[columnFrom].cards[cardId]
-	delete(r.columns[columnFrom].cards, cardId)
+func (r *Room) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
+	target := r.retro.GetCard(columnFrom, cardId)
+
+	r.retro.Get(columnTo).Add(target)
+	r.retro.Get(columnFrom).Remove(cardId)
 
 	conn.Broadcast(sock.Msg{
 		Id:   conn.Name,
@@ -225,7 +197,7 @@ func (r *Retro) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
 	})
 }
 
-func (r *Retro) stageOp(conn *sock.Conn, stage string) {
+func (r *Room) stageOp(conn *sock.Conn, stage string) {
 	r.stage = stage
 
 	conn.Broadcast(sock.Msg{
@@ -235,8 +207,8 @@ func (r *Retro) stageOp(conn *sock.Conn, stage string) {
 	})
 }
 
-func (r *Retro) revealOp(conn *sock.Conn, columnId, cardId string) {
-	r.columns[columnId].cards[cardId].revealed = true
+func (r *Room) revealOp(conn *sock.Conn, columnId, cardId string) {
+	r.retro.GetCard(columnId, cardId).Revealed = true
 
 	conn.Broadcast(sock.Msg{
 		Id:   conn.Name,
@@ -245,12 +217,15 @@ func (r *Retro) revealOp(conn *sock.Conn, columnId, cardId string) {
 	})
 }
 
-func (r *Retro) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo string) {
-	from := r.columns[columnFrom].cards[cardFrom]
-	to := r.columns[columnTo].cards[cardTo]
+func (r *Room) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo string) {
+	from := r.retro.GetCard(columnFrom, cardFrom)
+	to := r.retro.GetCard(columnTo, cardTo)
 
-	delete(r.columns[columnFrom].cards, cardFrom)
-	to.contents = append(to.contents, from.contents...)
+	r.retro.Get(columnFrom).Remove(cardFrom)
+
+	for _, content := range from.Contents() {
+		to.Add(content)
+	}
 
 	conn.Broadcast(sock.Msg{
 		Id:   conn.Name,
@@ -259,8 +234,8 @@ func (r *Retro) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo 
 	})
 }
 
-func (r *Retro) voteOp(conn *sock.Conn, columnId, cardId string) {
-	r.columns[columnId].cards[cardId].votes += 1
+func (r *Room) voteOp(conn *sock.Conn, columnId, cardId string) {
+	r.retro.GetCard(columnId, cardId).Votes += 1
 
 	conn.Broadcast(sock.Msg{
 		Id:   conn.Name,
@@ -270,14 +245,14 @@ func (r *Retro) voteOp(conn *sock.Conn, columnId, cardId string) {
 }
 
 func main() {
-	retro := NewRetro()
-	retro.AddColumn(NewColumn("Start"))
-	retro.AddColumn(NewColumn("More"))
-	retro.AddColumn(NewColumn("Keep"))
-	retro.AddColumn(NewColumn("Less"))
-	retro.AddColumn(NewColumn("Stop"))
+	room := NewRoom()
+	room.retro.Add(models.NewColumn(strId(), "Start"))
+	room.retro.Add(models.NewColumn(strId(), "More"))
+	room.retro.Add(models.NewColumn(strId(), "Keep"))
+	room.retro.Add(models.NewColumn(strId(), "Less"))
+	room.retro.Add(models.NewColumn(strId(), "Stop"))
 
-	http.Handle("/ws", websocket.Handler(retro.websocketHandler))
+	http.Handle("/ws", websocket.Handler(room.websocketHandler))
 
 	log.Println("listening on :8080")
 	http.ListenAndServe(":8080", nil)
