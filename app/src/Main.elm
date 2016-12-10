@@ -15,6 +15,7 @@ import Json.Encode as Encode
 import Column exposing (Column)
 import Card exposing (Card, Content)
 import Retro exposing (Retro)
+import Sock
 
 main =
     Html.program
@@ -73,55 +74,28 @@ type Msg = SetId (Maybe String)
          | Join
          | Vote String String
 
-type alias SocketMsg =
-    { id : String
-    , op : String
-    , args : List String
-    }
-
-socketMsgDecoder : Decode.Decoder SocketMsg
-socketMsgDecoder =
-    Pipeline.decode SocketMsg
-        |> Pipeline.required "id" Decode.string
-        |> Pipeline.required "op" Decode.string
-        |> Pipeline.required "args" (Decode.list Decode.string)
-
-socketMsgEncoder : SocketMsg -> Encode.Value
-socketMsgEncoder value =
-    Encode.object
-        [ ("id", Encode.string value.id)
-        , ("op", Encode.string value.op)
-        , ("args", Encode.list (List.map Encode.string value.args))
-        ]
-
-sendMsg : String -> String -> List String -> Cmd Msg
-sendMsg id op args =
-    SocketMsg id op args
-        |> socketMsgEncoder
-        |> Encode.encode 0
-        |> WebSocket.send "ws://localhost:8080/ws"
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         Vote columnId cardId ->
-            model ! [ sendMsg model.user "vote" [columnId, cardId] ]
+            model ! [ Sock.send model.user "vote" [columnId, cardId] ]
 
         ChangeName name ->
             { model | user = name } ! []
         Join ->
-            { model | joined = True } ! [ sendMsg model.user "init" [model.user] ]
+            { model | joined = True } ! [ Sock.send model.user "init" [model.user] ]
 
         SetId id ->
             case id of
-                Just v -> { model | user = v, joined = True } ! [ sendMsg v "init" [v] ]
+                Just v -> { model | user = v, joined = True } ! [ Sock.send v "init" [v] ]
                 Nothing -> model ! [ ]
 
         SetStage stage ->
-            { model | stage = stage } ! [ sendMsg model.user "stage" [toString stage] ]
+            { model | stage = stage } ! [ Sock.send model.user "stage" [toString stage] ]
 
         Reveal columnId cardId ->
-            model ! [ sendMsg model.user "reveal" [columnId, cardId] ]
+            model ! [ Sock.send model.user "reveal" [columnId, cardId] ]
 
         MouseOver columnId cardId ->
             { model | cardDragging = Just (columnId, cardId) } ! []
@@ -140,7 +114,7 @@ update msg model =
                         move (columnFrom, cardId) (columnTo, _) = { model
                                                                       | cardOver = Nothing
                                                                       , cardDragging = Nothing
-                                                                  } ! [ sendMsg model.user "move" [columnFrom, columnTo, cardId] ]
+                                                                  } ! [ Sock.send model.user "move" [columnFrom, columnTo, cardId] ]
                     in
                         Maybe.map2 move model.cardDragging model.cardOver
                             |> Maybe.withDefault (model, Cmd.none)
@@ -152,7 +126,7 @@ update msg model =
                                 Just cardTo -> { model
                                                    | cardOver = Nothing
                                                    , cardDragging = Nothing
-                                               } ! [ sendMsg model.user "group" [columnFrom, cardFrom, columnTo, cardTo] ]
+                                               } ! [ Sock.send model.user "group" [columnFrom, cardFrom, columnTo, cardTo] ]
                                 Nothing -> (model, Cmd.none)
                     in
                         Maybe.map2 move model.cardDragging model.cardOver
@@ -163,17 +137,14 @@ update msg model =
 
         ChangeInput columnId input ->
             if String.contains "\n" input then
-                { model | input = "" } ! [ sendMsg model.user "add" [columnId, model.input] ]
+                { model | input = "" } ! [ Sock.send model.user "add" [columnId, model.input] ]
             else
                 { model | input = input } ! []
 
         Socket data ->
-            case Decode.decodeString socketMsgDecoder data of
-                Ok socketMsg -> socketUpdate socketMsg model
-                Err _ -> model ! []
+            Sock.update data model socketUpdate
 
-
-socketUpdate : SocketMsg -> Model -> (Model, Cmd Msg)
+socketUpdate : Sock.SocketMsg -> Model -> (Model, Cmd Msg)
 socketUpdate msg model =
     case msg.op of
         "stage" ->
@@ -464,6 +435,6 @@ onDragStart tagger =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ WebSocket.listen "ws://localhost:8080/ws" Socket
+        [ Sock.listen "ws://localhost:8080/ws" Socket
         , storageGot SetId
         ]
