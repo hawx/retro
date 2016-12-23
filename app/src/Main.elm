@@ -248,7 +248,7 @@ view model =
           Bulma.modal
             [ Bulma.box []
                   [ Html.a [ Attr.class "button is-primary"
-                           , Attr.href "http://localhost:8080/oauth/login"
+                           , Attr.href "/oauth/login"
                            ]
                         [ Html.text "Sign-in with GitHub" ]
                   ]

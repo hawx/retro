@@ -293,6 +293,8 @@ func main() {
 	room.retro.Add(models.NewColumn(strId(), "Less"))
 	room.retro.Add(models.NewColumn(strId(), "Stop"))
 
+	http.Handle("/", http.FileServer(http.Dir("app/dist")))
+
 	http.Handle("/ws", websocket.Handler(room.websocketHandler))
 
 	ctx := context.Background()
@@ -338,9 +340,9 @@ func main() {
 		if inOrg {
 			room.AddUser(user)
 
-			http.Redirect(w, r, "http://localhost:8090/?user="+user, http.StatusFound)
+			http.Redirect(w, r, "/?user="+user, http.StatusFound)
 		} else {
-			http.Redirect(w, r, "http://localhost:8090/?error=not_in_org", http.StatusFound)
+			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
 		}
 	})
 
