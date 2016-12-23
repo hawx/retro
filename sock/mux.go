@@ -32,5 +32,8 @@ func (m *Mux) Serve(conn *Conn) error {
 		}
 
 		handler(conn, msg.Args)
+		if conn.Err != nil {
+			return conn.Err
+		}
 	}
 }

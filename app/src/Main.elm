@@ -203,6 +203,22 @@ socketUpdate msg model =
                 _ ->
                     model ! []
 
+        "error" ->
+            case msg.args of
+                [error] ->
+                    handleError error model
+                _ ->
+                    model ! []
+
+        _ ->
+            model ! []
+
+handleError : String -> Model -> (Model, Cmd Msg)
+handleError error model =
+    case error of
+        "unknown_user" ->
+            { model | user = "", joined = False } ! []
+
         _ ->
             model ! []
 
@@ -231,9 +247,10 @@ view model =
         modal =
           Bulma.modal
             [ Bulma.box []
-                  [ Bulma.label "Name"
-                  , Bulma.input [ Event.onInput ChangeName ]
-                  , Bulma.button [ Attr.class "is-primary", Event.onClick Join ] [ Html.text "Join" ]
+                  [ Html.a [ Attr.class "button is-primary"
+                           , Attr.href "http://localhost:8080/oauth/login"
+                           ]
+                        [ Html.text "Sign-in with GitHub" ]
                   ]
             ]
     in
