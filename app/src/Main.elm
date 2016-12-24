@@ -80,10 +80,8 @@ update msg model =
         Join ->
             { model | joined = True } ! [ Sock.send model.user "init" [model.user] ]
 
-        SetId id ->
-            case id of
-                Just v -> { model | user = v, joined = True } ! [ Sock.send v "init" [v] ]
-                Nothing -> model ! [ ]
+        SetId (Just id) ->
+            { model | user = id, joined = True } ! [ Sock.send id "init" [id] ]
 
         SetStage stage ->
             { model | stage = stage } ! [ Sock.send model.user "stage" [toString stage] ]
@@ -120,95 +118,60 @@ update msg model =
         Socket data ->
             Sock.update data model socketUpdate
 
+        _ ->
+            model ! []
+
 socketUpdate : Sock.SocketMsg -> Model -> (Model, Cmd Msg)
 socketUpdate msg model =
-    case msg.op of
-        "stage" ->
-            case msg.args of
-                [stage] ->
-                    case stage of
-                        "Thinking" -> { model | stage = Thinking } ! []
-                        "Presenting" -> { model | stage = Presenting } ! []
-                        "Voting" -> { model | stage = Voting } ! []
-                        "Discussing" -> { model | stage = Discussing } ! []
-                        _ -> model ! []
+    case (msg.op, msg.args) of
+        ("stage", [stage]) ->
+            case stage of
+                "Thinking" -> { model | stage = Thinking } ! []
+                "Presenting" -> { model | stage = Presenting } ! []
+                "Voting" -> { model | stage = Voting } ! []
+                "Discussing" -> { model | stage = Discussing } ! []
+                _ -> model ! []
 
-                _ ->
-                    model ! []
+        ("card", [columnId, cardId, cardRevealed]) ->
+            let
+                card =
+                    { id = cardId
+                    , votes = 0
+                    , revealed = cardRevealed == "true"
+                    , contents = [ ]
+                    }
+            in
+                { model | retro = Retro.addCard columnId card model.retro } ! []
 
-        "card" ->
-            case msg.args of
-                [columnId, cardId, cardRevealed] ->
-                    let
-                        card =
-                            { id = cardId
-                            , votes = 0
-                            , revealed = cardRevealed == "true"
-                            , contents = [ ]
-                            }
-                    in
-                        { model | retro = Retro.addCard columnId card model.retro } ! []
-                _ ->
-                    model ! []
+        ("content", [columnId, cardId, _, contentText]) ->
+            let content =
+                    { id = ""
+                    , text = contentText
+                    , author = msg.id
+                    }
+            in
+                { model | retro = Retro.addContent columnId cardId content model.retro } ! []
 
-        "content" ->
-            case msg.args of
-                [columnId, cardId, _, contentText] ->
-                    let content =
-                            { id = ""
-                            , text = contentText
-                            , author = msg.id
-                            }
-                    in
-                        { model | retro = Retro.addContent columnId cardId content model.retro } ! []
+        ("column", [columnId, columnName]) ->
+            let
+                column = { id = columnId, name = columnName, cards = Dict.empty }
+            in
+                { model | retro = Retro.addColumn column model.retro } ! []
 
-                _ ->
-                    model ! []
+        ("move", [columnFrom, columnTo, cardId]) ->
+            { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
 
-        "column" ->
-            case msg.args of
-                [columnId, columnName] ->
-                    let
-                        column = { id = columnId, name = columnName, cards = Dict.empty }
-                    in
-                        { model | retro = Retro.addColumn column model.retro } ! []
-                _ ->
-                    model ! []
+        ("reveal", [columnId, cardId]) ->
+            { model | retro = Retro.revealCard columnId cardId model.retro } ! []
 
-        "move" ->
-            case msg.args of
-                [columnFrom, columnTo, cardId] ->
-                    { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
-                _ ->
-                    model ! []
+        ("group",[columnFrom, cardFrom, columnTo, cardTo]) ->
+            { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
 
-        "reveal" ->
-            case msg.args of
-                [columnId, cardId] ->
-                    { model | retro = Retro.revealCard columnId cardId model.retro } ! []
-                _ ->
-                    model ! []
+        ("vote", [columnId, cardId]) ->
+            { model | retro = Retro.voteCard columnId cardId model.retro } ! []
 
-        "group" ->
-            case msg.args of
-                [columnFrom, cardFrom, columnTo, cardTo] ->
-                    { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
-                _ ->
-                    model ! []
-
-        "vote" ->
-            case msg.args of
-                [columnId, cardId] ->
-                    { model | retro = Retro.voteCard columnId cardId model.retro } ! []
-                _ ->
-                    model ! []
-
-        "error" ->
-            case msg.args of
-                [error] ->
-                    handleError error model
-                _ ->
-                    model ! []
+        ("error", [error]) ->
+            handleError error model
 
         _ ->
             model ! []
