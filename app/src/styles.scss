@@ -11,7 +11,7 @@
 .card.not-revealed {
   opacity: .5;
 
-  &:hover {
+  &.can-reveal:hover {
     opacity: 1;
 
     &::after {
