@@ -94,12 +94,18 @@ update msg model =
                 Just ((columnFrom, cardFrom), (columnTo, maybeCardTo)) ->
                     case model.stage of
                         Thinking ->
-                            { model | dnd = DragAndDrop.empty } ! [ Sock.send model.user "move" [columnFrom, columnTo, cardFrom] ]
+                            if columnFrom /= columnTo then
+                                { model | dnd = DragAndDrop.empty } ! [ Sock.send model.user "move" [columnFrom, columnTo, cardFrom] ]
+                            else
+                                model ! []
 
                         Voting ->
                             case maybeCardTo of
                                 Just cardTo ->
-                                    { model | dnd = DragAndDrop.empty } ! [ Sock.send model.user "group" [columnFrom, cardFrom, columnTo, cardTo ] ]
+                                    if cardFrom /= cardTo then
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.send model.user "group" [columnFrom, cardFrom, columnTo, cardTo ] ]
+                                    else
+                                        model ! []
                                 Nothing ->
                                     model ! []
 
@@ -305,7 +311,9 @@ cardView connId stage dnd columnId (cardId, card) =
             Presenting ->
                 if not card.revealed then
                     if Card.authored connId card then
-                        [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
+                        [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed)
+                                                      , ("can-reveal", True)
+                                                      ]
                                      , Event.onClick (Reveal columnId cardId)
                                      ]
                               [ Bulma.cardContent [] [ content ] ]
@@ -322,6 +330,7 @@ cardView connId stage dnd columnId (cardId, card) =
                                   [ DragAndDrop.draggable DnD (columnId, cardId)
                                   , DragAndDrop.dropzone DnD (columnId, Just cardId)
                                   , [ Attr.classList [ ("over", dnd.over == Just (columnId, Just cardId))
+                                                     , ("not-revealed", not card.revealed)
                                                      ]
                                     ]
                                   ])
@@ -336,9 +345,13 @@ cardView connId stage dnd columnId (cardId, card) =
                 ]
 
             _ ->
-                [ Bulma.card []
-                      [ Bulma.cardContent [] [ content ] ]
-                ]
+                if card.revealed || Card.authored connId card then
+                    [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
+                                 ]
+                          [ Bulma.cardContent [] [ content ] ]
+                    ]
+                else
+                    []
 
 
 titleCardView : String -> Html Msg
