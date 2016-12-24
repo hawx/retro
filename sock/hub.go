@@ -8,33 +8,6 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-// Msg is a standard message type that should work for all the use cases required.
-type Msg struct {
-	// Id is the name for the connection that the message originated from, or an
-	// empty string if the message originated from the server.
-	Id string `json:"id"`
-
-	// Op is the name of the operation being carried out.
-	Op string `json:"op"`
-
-	// Args is a list of arguments for the operation.
-	Args []string `json:"args"`
-}
-
-type Conn struct {
-	Name string
-	hub  *Hub
-	ws   *websocket.Conn
-}
-
-func (c *Conn) Send(msg Msg) {
-	websocket.JSON.Send(c.ws, msg)
-}
-
-func (c *Conn) Broadcast(msg Msg) {
-	c.hub.broadcast(msg)
-}
-
 type Hub struct {
 	mu          sync.RWMutex
 	connections map[*Conn]struct{}
@@ -50,6 +23,7 @@ func NewHub() *Hub {
 func (h *Hub) AddConnection(ws *websocket.Conn) *Conn {
 	conn := &Conn{
 		Name: "",
+		Err:  nil,
 		ws:   ws,
 		hub:  h,
 	}

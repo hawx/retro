@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
+	"os"
+	"sync"
 
 	"github.com/google/uuid"
 
@@ -11,6 +16,7 @@ import (
 	"hawx.me/code/retro/sock"
 
 	"golang.org/x/net/websocket"
+	"golang.org/x/oauth2"
 )
 
 func strId() string {
@@ -29,12 +35,16 @@ type Room struct {
 	hub   *sock.Hub
 	mux   *sock.Mux
 	retro *models.Retro
+
+	mu    sync.RWMutex
+	users map[string]struct{}
 }
 
 func NewRoom() *Room {
 	room := &Room{
 		hub:   sock.NewHub(),
 		retro: models.NewRetro(),
+		users: map[string]struct{}{},
 	}
 
 	room.mux = retroMux(room)
@@ -47,6 +57,19 @@ func boolToString(b bool) string {
 		return "true"
 	}
 	return "false"
+}
+
+func (r *Room) AddUser(user string) {
+	r.mu.Lock()
+	r.users[user] = struct{}{}
+	r.mu.Unlock()
+}
+
+func (r *Room) IsUser(user string) bool {
+	r.mu.RLock()
+	_, ok := r.users[user]
+	r.mu.RUnlock()
+	return ok
 }
 
 func (r *Room) websocketHandler(ws *websocket.Conn) {
@@ -64,6 +87,18 @@ func retroMux(r *Room) *sock.Mux {
 	mux.Handle("init", func(conn *sock.Conn, args []string) {
 		if len(args) == 1 {
 			conn.Name = args[0]
+
+			if !r.IsUser(conn.Name) {
+				conn.Err = errors.New("User not recognised: " + conn.Name)
+
+				conn.Send(sock.Msg{
+					Id:   "",
+					Op:   "error",
+					Args: []string{"unknown_user"},
+				})
+
+				return
+			}
 
 			r.initOp(conn)
 		}
@@ -245,6 +280,12 @@ func (r *Room) voteOp(conn *sock.Conn, columnId, cardId string) {
 }
 
 func main() {
+	var (
+		clientID     = os.Getenv("GH_CLIENT_ID")
+		clientSecret = os.Getenv("GH_CLIENT_SECRET")
+		organisation = os.Getenv("ORGANISATION")
+	)
+
 	room := NewRoom()
 	room.retro.Add(models.NewColumn(strId(), "Start"))
 	room.retro.Add(models.NewColumn(strId(), "More"))
@@ -252,8 +293,99 @@ func main() {
 	room.retro.Add(models.NewColumn(strId(), "Less"))
 	room.retro.Add(models.NewColumn(strId(), "Stop"))
 
+	http.Handle("/", http.FileServer(http.Dir("app/dist")))
+
 	http.Handle("/ws", websocket.Handler(room.websocketHandler))
+
+	ctx := context.Background()
+	conf := &oauth2.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Scopes:       []string{"user", "read:org"},
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  "https://github.com/login/oauth/authorize",
+			TokenURL: "https://github.com/login/oauth/access_token",
+		},
+	}
+
+	http.HandleFunc("/oauth/login", func(w http.ResponseWriter, r *http.Request) {
+		url := conf.AuthCodeURL("state", oauth2.AccessTypeOnline)
+
+		http.Redirect(w, r, url, http.StatusFound)
+	})
+
+	http.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
+		code := r.FormValue("code")
+
+		tok, err := conf.Exchange(ctx, code)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		client := conf.Client(ctx, tok)
+
+		user, err := getUser(client)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		inOrg, err := isInOrg(client, organisation)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		if inOrg {
+			room.AddUser(user)
+
+			http.Redirect(w, r, "/?user="+user, http.StatusFound)
+		} else {
+			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
+		}
+	})
 
 	log.Println("listening on :8080")
 	http.ListenAndServe(":8080", nil)
+}
+
+func getUser(client *http.Client) (string, error) {
+	resp, err := client.Get("https://api.github.com/user")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var data struct {
+		Login string `json:"login"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return "", err
+	}
+
+	return data.Login, nil
+}
+
+func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
+	resp, err := client.Get("https://api.github.com/user/orgs")
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	var data []struct {
+		Login string `json:"login"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return false, err
+	}
+
+	for _, org := range data {
+		if org.Login == expectedOrg {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
