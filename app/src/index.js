@@ -10,8 +10,8 @@ var qs = window.location.search.substring(1).split('&').reduce(function (a, e) {
   return a;
 }, {});
 
-if (qs['user']) {
-  localStorage.setItem('id', qs['user']);
+if (qs['user'] && qs['token']) {
+  localStorage.setItem('id', qs['user'] + ';' + qs['token']);
   window.location.search = '';
 }
 
