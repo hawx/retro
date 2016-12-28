@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 
 	"github.com/google/uuid"
@@ -176,14 +177,14 @@ func (r *Room) initOp(conn *sock.Conn) {
 			conn.Send(sock.Msg{
 				Id:   "",
 				Op:   "card",
-				Args: []string{columnId, cardId, boolToString(card.Revealed)},
+				Args: []string{columnId, cardId, boolToString(card.Revealed), strconv.Itoa(card.Votes)},
 			})
 
-			for contentIndex, content := range card.Contents() {
+			for _, content := range card.Contents() {
 				conn.Send(sock.Msg{
 					Id:   content.Author,
 					Op:   "content",
-					Args: []string{columnId, cardId, string(contentIndex), content.Text},
+					Args: []string{columnId, cardId, content.Text},
 				})
 			}
 		}
@@ -209,13 +210,13 @@ func (r *Room) addOp(conn *sock.Conn, columnId, cardText string) {
 	conn.Broadcast(sock.Msg{
 		Id:   "",
 		Op:   "card",
-		Args: []string{columnId, card.Id, boolToString(card.Revealed)},
+		Args: []string{columnId, card.Id, boolToString(card.Revealed), strconv.Itoa(card.Votes)},
 	})
 
 	conn.Broadcast(sock.Msg{
 		Id:   content.Author,
 		Op:   "content",
-		Args: []string{columnId, card.Id, string(0), content.Text},
+		Args: []string{columnId, card.Id, content.Text},
 	})
 }
 

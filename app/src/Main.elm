@@ -138,18 +138,22 @@ socketUpdate msg model =
                 "Discussing" -> { model | stage = Discussing } ! []
                 _ -> model ! []
 
-        ("card", [columnId, cardId, cardRevealed]) ->
-            let
-                card =
-                    { id = cardId
-                    , votes = 0
-                    , revealed = cardRevealed == "true"
-                    , contents = [ ]
-                    }
-            in
-                { model | retro = Retro.addCard columnId card model.retro } ! []
+        ("card", [columnId, cardId, cardRevealed, cardVotes]) ->
+            case String.toInt cardVotes of
+                Ok votes ->
+                    let
+                        card =
+                            { id = cardId
+                            , votes = votes
+                            , revealed = cardRevealed == "true"
+                            , contents = [ ]
+                            }
+                    in
+                        { model | retro = Retro.addCard columnId card model.retro } ! []
+                Err e ->
+                    Debug.log (toString e) (model ! [])
 
-        ("content", [columnId, cardId, _, contentText]) ->
+        ("content", [columnId, cardId, contentText]) ->
             let content =
                     { id = ""
                     , text = contentText
@@ -179,8 +183,8 @@ socketUpdate msg model =
         ("error", [error]) ->
             handleError error model
 
-        _ ->
-            model ! []
+        missing ->
+            Debug.log (toString missing) (model ! [])
 
 handleError : String -> Model -> (Model, Cmd Msg)
 handleError error model =
@@ -255,9 +259,58 @@ tabsView stage =
 
 columnsView : String -> Stage -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
 columnsView connId stage dnd columns =
-    Bulma.columns [ ]
-        <| List.map (columnView connId stage dnd)
-        <| Dict.toList columns
+    if stage == Discussing then
+        let
+            fst (a, b) = a
+            snd (a, b) = b
+
+            getList : Dict comparable a -> List a
+            getList dict = Dict.toList dict |> List.map snd
+
+            cards : List Card
+            cards = getList columns
+                  |> List.map (.cards)
+                  |> List.map getList
+                  |> List.concat
+
+            cardsByVote : List (Int, List Card)
+            cardsByVote = cards
+                        |> group Dict.empty
+                        |> Dict.toList
+                        |> List.sortBy fst
+                        |> List.reverse
+
+            cardToView card =
+                Bulma.card []
+                      [ Bulma.cardContent [] [ contentsView card.contents ]
+                      ]
+
+            groupInsert : a -> Maybe (List a) -> Maybe (List a)
+            groupInsert x maybe =
+                case maybe of
+                    Just list -> Just (x :: list)
+                    Nothing -> Just [x]
+
+            group : Dict Int (List Card) -> List Card -> Dict Int (List Card)
+            group res list =
+                case list of
+                    (x :: xs) -> group (Dict.update x.votes (groupInsert x) res) xs
+                    [] -> res
+
+            columnView : (Int, List Card) -> Html Msg
+            columnView (vote, cards) =
+                Bulma.column []
+                    (titleCardView (toString vote) :: List.map cardToView cards)
+
+        in
+            cardsByVote
+                |> List.map columnView
+                |> Bulma.columns [ Attr.class "is-multiline" ]
+
+    else
+        Dict.toList columns
+            |> List.map (columnView connId stage dnd)
+            |> Bulma.columns [ ]
 
 columnView : String -> Stage -> DragAndDrop.Model CardDragging CardOver -> (String, Column) -> Html Msg
 columnView connId stage dnd (columnId, column) =
