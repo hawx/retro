@@ -80,8 +80,12 @@ update msg model =
         Join ->
             { model | joined = True } ! [ Sock.send model.user "init" [model.user] ]
 
-        SetId (Just id) ->
-            { model | user = id, joined = True } ! [ Sock.send id "init" [id] ]
+        SetId (Just parts) ->
+            case String.split ";" parts of
+                [id, token] ->
+                    { model | user = id, joined = True } ! [ Sock.send id "init" [id, token] ]
+                _ ->
+                    { model | user = "", joined = False } ! []
 
         SetStage stage ->
             { model | stage = stage } ! [ Sock.send model.user "stage" [toString stage] ]
@@ -116,10 +120,10 @@ update msg model =
                     { model | dnd = DragAndDrop.update subMsg model.dnd } ! []
 
         ChangeInput columnId input ->
-            if String.contains "\n" input then
+            if String.endsWith "\n" input && String.trim model.input /= "" then
                 { model | input = "" } ! [ Sock.send model.user "add" [columnId, model.input] ]
             else
-                { model | input = input } ! []
+                { model | input = String.trim input } ! []
 
         Socket data ->
             Sock.update data model socketUpdate

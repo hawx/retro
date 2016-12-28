@@ -38,14 +38,14 @@ type Room struct {
 	retro *models.Retro
 
 	mu    sync.RWMutex
-	users map[string]struct{}
+	users map[string]string
 }
 
 func NewRoom() *Room {
 	room := &Room{
 		hub:   sock.NewHub(),
 		retro: models.NewRetro(),
-		users: map[string]struct{}{},
+		users: map[string]string{},
 	}
 
 	room.mux = retroMux(room)
@@ -60,17 +60,17 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func (r *Room) AddUser(user string) {
+func (r *Room) AddUser(user, token string) {
 	r.mu.Lock()
-	r.users[user] = struct{}{}
+	r.users[user] = token
 	r.mu.Unlock()
 }
 
-func (r *Room) IsUser(user string) bool {
+func (r *Room) IsUser(user, token string) bool {
 	r.mu.RLock()
-	_, ok := r.users[user]
+	expectedToken, ok := r.users[user]
 	r.mu.RUnlock()
-	return ok
+	return ok && token == expectedToken
 }
 
 func (r *Room) websocketHandler(ws *websocket.Conn) {
@@ -86,10 +86,11 @@ func retroMux(r *Room) *sock.Mux {
 	mux := sock.NewMux()
 
 	mux.Handle("init", func(conn *sock.Conn, args []string) {
-		if len(args) == 1 {
+		if len(args) == 2 {
 			conn.Name = args[0]
+			token := args[1]
 
-			if !r.IsUser(conn.Name) {
+			if !r.IsUser(conn.Name, token) {
 				conn.Err = errors.New("User not recognised: " + conn.Name)
 
 				conn.Send(sock.Msg{
@@ -339,9 +340,10 @@ func main() {
 		}
 
 		if inOrg {
-			room.AddUser(user)
+			token := strId()
+			room.AddUser(user, token)
 
-			http.Redirect(w, r, "/?user="+user, http.StatusFound)
+			http.Redirect(w, r, "/?user="+user+"&token="+token, http.StatusFound)
 		} else {
 			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
 		}
