@@ -291,6 +291,7 @@ func main() {
 
 		port   = flag.String("port", "8080", "")
 		socket = flag.String("socket", "", "")
+		assets = flag.String("assets", "app/dist", "")
 	)
 	flag.Parse()
 
@@ -301,7 +302,7 @@ func main() {
 	room.retro.Add(models.NewColumn(strId(), "Less"))
 	room.retro.Add(models.NewColumn(strId(), "Stop"))
 
-	http.Handle("/", http.FileServer(http.Dir("app/dist")))
+	http.Handle("/", http.FileServer(http.Dir(*assets)))
 
 	http.Handle("/ws", websocket.Handler(room.websocketHandler))
 
