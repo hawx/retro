@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 
 	"hawx.me/code/retro/models"
 	"hawx.me/code/retro/sock"
+	"hawx.me/code/serve"
 
 	"golang.org/x/net/websocket"
 	"golang.org/x/oauth2"
@@ -286,7 +288,11 @@ func main() {
 		clientID     = os.Getenv("GH_CLIENT_ID")
 		clientSecret = os.Getenv("GH_CLIENT_SECRET")
 		organisation = os.Getenv("ORGANISATION")
+
+		port   = flag.String("port", "8080", "")
+		socket = flag.String("socket", "", "")
 	)
+	flag.Parse()
 
 	room := NewRoom()
 	room.retro.Add(models.NewColumn(strId(), "Start"))
@@ -349,8 +355,7 @@ func main() {
 		}
 	})
 
-	log.Println("listening on :8080")
-	http.ListenAndServe(":8080", nil)
+	serve.Serve(*port, *socket, http.DefaultServeMux)
 }
 
 func getUser(client *http.Client) (string, error) {
