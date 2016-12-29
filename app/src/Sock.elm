@@ -31,11 +31,11 @@ send id op args =
     SocketMsg id op args
         |> socketMsgEncoder
         |> Encode.encode 0
-        |> WebSocket.send "ws://localhost:8080/ws"
+        |> WebSocket.send "wss://retro.hawx.me/ws"
 
-listen : String -> (String -> msg) -> Sub msg
-listen url tagger =
-    WebSocket.listen url tagger
+listen : (String -> msg) -> Sub msg
+listen tagger =
+    WebSocket.listen "wss://retro.hawx.me/ws" tagger
 
 update : String -> model -> (SocketMsg -> model -> (model, Cmd msg)) -> (model, Cmd msg)
 update data model f =

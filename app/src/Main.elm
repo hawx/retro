@@ -439,6 +439,6 @@ addCardView columnId =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Sock.listen "ws://localhost:8080/ws" Socket
+        [ Sock.listen Socket
         , storageGot SetId
         ]
