@@ -19,12 +19,24 @@ import Sock
 import DragAndDrop
 
 main =
-    Html.program
+    Html.programWithFlags
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
         }
+
+type alias Flags =
+    { host : String
+    , isSecure : Bool
+    }
+
+webSocketUrl : Flags -> String
+webSocketUrl flags =
+    if flags.isSecure then
+        "wss://" ++ flags.host ++ "/ws"
+    else
+        "ws://" ++ flags.host ++ "/ws"
 
 -- Model
 
@@ -40,16 +52,18 @@ type alias Model =
     , retro : Retro
     , input : String
     , dnd : DragAndDrop.Model CardDragging CardOver
+    , flags : Flags
     }
 
-init : (Model, Cmd msg)
-init =
+init : Flags -> (Model, Cmd msg)
+init flags =
     { user = ""
     , joined = False
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
     , dnd = DragAndDrop.empty
+    , flags = flags
     } ! [ storageGet "id" ]
 
 -- Update
@@ -73,25 +87,25 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         Vote columnId cardId ->
-            model ! [ Sock.send model.user "vote" [columnId, cardId] ]
+            model ! [ Sock.send (webSocketUrl model.flags) model.user "vote" [columnId, cardId] ]
 
         ChangeName name ->
             { model | user = name } ! []
         Join ->
-            { model | joined = True } ! [ Sock.send model.user "init" [model.user] ]
+            { model | joined = True } ! [ Sock.send (webSocketUrl model.flags) model.user "init" [model.user] ]
 
         SetId (Just parts) ->
             case String.split ";" parts of
                 [id, token] ->
-                    { model | user = id, joined = True } ! [ Sock.send id "init" [id, token] ]
+                    { model | user = id, joined = True } ! [ Sock.send (webSocketUrl model.flags) id "init" [id, token] ]
                 _ ->
                     { model | user = "", joined = False } ! []
 
         SetStage stage ->
-            { model | stage = stage } ! [ Sock.send model.user "stage" [toString stage] ]
+            { model | stage = stage } ! [ Sock.send (webSocketUrl model.flags) model.user "stage" [toString stage] ]
 
         Reveal columnId cardId ->
-            model ! [ Sock.send model.user "reveal" [columnId, cardId] ]
+            model ! [ Sock.send (webSocketUrl model.flags) model.user "reveal" [columnId, cardId] ]
 
         DnD subMsg ->
             case DragAndDrop.isDrop subMsg model.dnd of
@@ -99,7 +113,7 @@ update msg model =
                     case model.stage of
                         Thinking ->
                             if columnFrom /= columnTo then
-                                { model | dnd = DragAndDrop.empty } ! [ Sock.send model.user "move" [columnFrom, columnTo, cardFrom] ]
+                                { model | dnd = DragAndDrop.empty } ! [ Sock.send (webSocketUrl model.flags) model.user "move" [columnFrom, columnTo, cardFrom] ]
                             else
                                 model ! []
 
@@ -107,7 +121,7 @@ update msg model =
                             case maybeCardTo of
                                 Just cardTo ->
                                     if cardFrom /= cardTo then
-                                        { model | dnd = DragAndDrop.empty } ! [ Sock.send model.user "group" [columnFrom, cardFrom, columnTo, cardTo ] ]
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.send (webSocketUrl model.flags) model.user "group" [columnFrom, cardFrom, columnTo, cardTo ] ]
                                     else
                                         model ! []
                                 Nothing ->
@@ -121,7 +135,7 @@ update msg model =
 
         ChangeInput columnId input ->
             if String.endsWith "\n" input && String.trim model.input /= "" then
-                { model | input = "" } ! [ Sock.send model.user "add" [columnId, model.input] ]
+                { model | input = "" } ! [ Sock.send (webSocketUrl model.flags) model.user "add" [columnId, model.input] ]
             else
                 { model | input = String.trim input } ! []
 
@@ -261,13 +275,13 @@ tabsView stage =
                 ]
             ]
 
+fst (a, b) = a
+snd (a, b) = b
+
 columnsView : String -> Stage -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
 columnsView connId stage dnd columns =
     if stage == Discussing then
         let
-            fst (a, b) = a
-            snd (a, b) = b
-
             getList : Dict comparable a -> List a
             getList dict = Dict.toList dict |> List.map snd
 
@@ -313,6 +327,7 @@ columnsView connId stage dnd columns =
 
     else
         Dict.toList columns
+            |> List.sortBy (fst)
             |> List.map (columnView connId stage dnd)
             |> Bulma.columns [ ]
 
@@ -439,6 +454,6 @@ addCardView columnId =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Sock.listen Socket
+        [ Sock.listen (webSocketUrl model.flags) Socket
         , storageGot SetId
         ]

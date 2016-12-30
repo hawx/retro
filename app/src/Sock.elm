@@ -26,16 +26,16 @@ socketMsgEncoder value =
         , ("args", Encode.list (List.map Encode.string value.args))
         ]
 
-send : String -> String -> List String -> Cmd msg
-send id op args =
+send : String -> String -> String -> List String -> Cmd msg
+send url id op args =
     SocketMsg id op args
         |> socketMsgEncoder
         |> Encode.encode 0
-        |> WebSocket.send "wss://retro.hawx.me/ws"
+        |> WebSocket.send url
 
-listen : (String -> msg) -> Sub msg
-listen tagger =
-    WebSocket.listen "wss://retro.hawx.me/ws" tagger
+listen : String -> (String -> msg) -> Sub msg
+listen url tagger =
+    WebSocket.listen url tagger
 
 update : String -> model -> (SocketMsg -> model -> (model, Cmd msg)) -> (model, Cmd msg)
 update data model f =

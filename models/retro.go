@@ -4,26 +4,31 @@ import "sync"
 
 type Retro struct {
 	sync.RWMutex
-	columns map[string]*Column
+	columns []*Column
 }
 
 func NewRetro() *Retro {
 	return &Retro{
-		columns: map[string]*Column{},
+		columns: []*Column{},
 	}
 }
 
 func (r *Retro) Add(column *Column) {
 	r.Lock()
-	r.columns[column.Id] = column
+	r.columns = append(r.columns, column)
 	r.Unlock()
 }
 
 func (r *Retro) Get(id string) *Column {
 	r.RLock()
-	column := r.columns[id]
-	r.RUnlock()
-	return column
+	defer r.RUnlock()
+
+	for _, column := range r.columns {
+		if column.Id == id {
+			return column
+		}
+	}
+	return nil
 }
 
 func (r *Retro) GetCard(columnId, cardId string) *Card {
@@ -34,14 +39,12 @@ func (r *Retro) GetCard(columnId, cardId string) *Card {
 	return nil
 }
 
-func (r *Retro) Columns() map[string]*Column {
+func (r *Retro) Columns() []*Column {
 	r.RLock()
 	defer r.RUnlock()
 
-	columns := map[string]*Column{}
-	for id, column := range r.columns {
-		columns[id] = column
-	}
+	columns := make([]*Column, len(r.columns))
+	copy(columns, r.columns)
 
 	return columns
 }

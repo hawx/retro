@@ -15,7 +15,10 @@ if (qs['user'] && qs['token']) {
   window.location.search = '';
 }
 
-var app = Elm.Main.fullscreen();
+var app = Elm.Main.fullscreen({
+  host: window.location.host,
+  isSecure: window.location.protocol === 'https:'
+});
 
 app.ports.storageSet.subscribe(function([key, value]) {
   localStorage.setItem(key, value);

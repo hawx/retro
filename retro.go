@@ -169,25 +169,25 @@ func (r *Room) initOp(conn *sock.Conn) {
 		})
 	}
 
-	for columnId, column := range r.retro.Columns() {
+	for _, column := range r.retro.Columns() {
 		conn.Send(sock.Msg{
 			Id:   "",
 			Op:   "column",
-			Args: []string{columnId, column.Name},
+			Args: []string{column.Id, column.Name},
 		})
 
 		for cardId, card := range column.Cards() {
 			conn.Send(sock.Msg{
 				Id:   "",
 				Op:   "card",
-				Args: []string{columnId, cardId, boolToString(card.Revealed), strconv.Itoa(card.Votes)},
+				Args: []string{column.Id, cardId, boolToString(card.Revealed), strconv.Itoa(card.Votes)},
 			})
 
 			for _, content := range card.Contents() {
 				conn.Send(sock.Msg{
 					Id:   content.Author,
 					Op:   "content",
-					Args: []string{columnId, cardId, content.Text},
+					Args: []string{column.Id, cardId, content.Text},
 				})
 			}
 		}
@@ -296,11 +296,11 @@ func main() {
 	flag.Parse()
 
 	room := NewRoom()
-	room.retro.Add(models.NewColumn(strId(), "Start"))
-	room.retro.Add(models.NewColumn(strId(), "More"))
-	room.retro.Add(models.NewColumn(strId(), "Keep"))
-	room.retro.Add(models.NewColumn(strId(), "Less"))
-	room.retro.Add(models.NewColumn(strId(), "Stop"))
+	room.retro.Add(models.NewColumn("0", "Start"))
+	room.retro.Add(models.NewColumn("1", "More"))
+	room.retro.Add(models.NewColumn("2", "Keep"))
+	room.retro.Add(models.NewColumn("3", "Less"))
+	room.retro.Add(models.NewColumn("4", "Stop"))
 
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 
