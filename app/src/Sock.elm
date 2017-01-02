@@ -14,6 +14,7 @@ import WebSocket
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
+import Dict
 
 type alias SocketMsg =
     { id : String
@@ -140,58 +141,34 @@ update_ data model f =
         Err _ -> (model, Cmd.none)
 
 update : String -> model -> ((String, MsgData) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
-update data model2 f =
+update data model f =
     let
-        g (id, op, args, data2) model =
-            case op of
-                "stage" ->
-                    case Decode.decodeString stageDecoder data2 of
-                        Ok thing -> f (id, Stage thing) model
-                        Err _ -> (model, Cmd.none)
+        runOp decoder tagger d id m =
+            case Decode.decodeString decoder d of
+                Ok thing -> f (id, tagger thing) m
+                Err e -> f (id, Error (ErrorData e)) m
 
-                "card" ->
-                    case Decode.decodeString cardDecoder data2 of
-                        Ok thing -> f (id, Card thing) model
-                        Err _ -> (model, Cmd.none)
+        mux = Dict.fromList
+              [ ("stage", runOp stageDecoder Stage)
+              , ("card", runOp cardDecoder Card)
+              , ("content", runOp contentDecoder Content)
+              , ("column", runOp columnDecoder Column)
+              , ("move", runOp moveDecoder Move)
+              , ("reveal", runOp revealDecoder Reveal)
+              , ("group", runOp groupDecoder Group)
+              , ("vote", runOp voteDecoder Vote)
+              , ("error", runOp errorDecoder Error)
+              ]
 
-                "content" ->
-                    case Decode.decodeString contentDecoder data2 of
-                        Ok thing -> f (id, Content thing) model
-                        Err _ -> (model, Cmd.none)
+        runMux (id, op, args, data) model =
+            case Dict.get op mux of
+                Just guy ->
+                    guy data id model
 
-                "column" ->
-                    case Decode.decodeString columnDecoder data2 of
-                        Ok thing -> f (id, Column thing) model
-                        Err _ -> (model, Cmd.none)
-
-                "move" ->
-                    case Decode.decodeString moveDecoder data2 of
-                        Ok thing -> f (id, Move thing) model
-                        Err _ -> (model, Cmd.none)
-
-                "reveal" ->
-                    case Decode.decodeString revealDecoder data2 of
-                        Ok thing -> f (id, Reveal thing) model
-                        Err _ -> (model, Cmd.none)
-
-                "group" ->
-                    case Decode.decodeString groupDecoder data2 of
-                        Ok thing -> f (id, Group thing) model
-                        Err _ -> (model, Cmd.none)
-
-                "vote" ->
-                    case Decode.decodeString voteDecoder data2 of
-                        Ok thing -> f (id, Vote thing) model
-                        Err _ -> (model, Cmd.none)
-
-                "error" ->
-                    case Decode.decodeString errorDecoder data2 of
-                        Ok thing -> f (id, Error thing) model
-                        Err _ -> (model, Cmd.none)
-
-                _ -> (model, Cmd.none)
+                Nothing ->
+                    (model, Cmd.none)
     in
-        update_ data model2 g
+        update_ data model runMux
 
 init : String -> String -> String -> String -> Cmd msg
 init url id name token =
