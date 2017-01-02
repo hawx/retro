@@ -137,15 +137,15 @@ update msg model =
                 { model | input = String.trim input } ! []
 
         Socket data ->
-            Sock.update data model socketUpdate
+            Sock.update2 data model socketUpdate
 
         _ ->
             model ! []
 
-socketUpdate : (String, String, List String) -> Model -> (Model, Cmd Msg)
-socketUpdate (id, op, args) model =
-    case (op, args) of
-        ("stage", [stage]) ->
+socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
+socketUpdate (id, msgData) model =
+    case msgData of
+        Sock.Stage { stage } ->
             case stage of
                 "Thinking" -> { model | stage = Thinking } ! []
                 "Presenting" -> { model | stage = Presenting } ! []
@@ -153,53 +153,47 @@ socketUpdate (id, op, args) model =
                 "Discussing" -> { model | stage = Discussing } ! []
                 _ -> model ! []
 
-        ("card", [columnId, cardId, cardRevealed, cardVotes]) ->
-            case String.toInt cardVotes of
-                Ok votes ->
-                    let
-                        card =
-                            { id = cardId
-                            , votes = votes
-                            , revealed = cardRevealed == "true"
-                            , contents = [ ]
-                            }
-                    in
-                        { model | retro = Retro.addCard columnId card model.retro } ! []
-                Err e ->
-                    Debug.log (toString e) (model ! [])
+        Sock.Card { columnId, cardId, revealed, votes } ->
+            let
+                card =
+                    { id = cardId
+                    , votes = votes
+                    , revealed = revealed
+                    , contents = [ ]
+                    }
+            in
+                { model | retro = Retro.addCard columnId card model.retro } ! []
 
-        ("content", [columnId, cardId, contentText]) ->
+        Sock.Content { columnId, cardId, cardText } ->
             let content =
                     { id = ""
-                    , text = contentText
+                    , text = cardText
                     , author = id
                     }
             in
                 { model | retro = Retro.addContent columnId cardId content model.retro } ! []
 
-        ("column", [columnId, columnName]) ->
+        Sock.Column { columnId, columnName } ->
             let
                 column = { id = columnId, name = columnName, cards = Dict.empty }
             in
                 { model | retro = Retro.addColumn column model.retro } ! []
 
-        ("move", [columnFrom, columnTo, cardId]) ->
+        Sock.Move { columnFrom, columnTo, cardId } ->
             { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
 
-        ("reveal", [columnId, cardId]) ->
+        Sock.Reveal { columnId, cardId } ->
             { model | retro = Retro.revealCard columnId cardId model.retro } ! []
 
-        ("group",[columnFrom, cardFrom, columnTo, cardTo]) ->
+        Sock.Group { columnFrom, cardFrom, columnTo, cardTo } ->
             { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
 
-        ("vote", [columnId, cardId]) ->
+        Sock.Vote { columnId, cardId } ->
             { model | retro = Retro.voteCard columnId cardId model.retro } ! []
 
-        ("error", [error]) ->
+        Sock.Error { error } ->
             handleError error model
 
-        missing ->
-            Debug.log (toString missing) (model ! [])
 
 handleError : String -> Model -> (Model, Cmd Msg)
 handleError error model =

@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"sync"
 
 	"github.com/google/uuid"
@@ -92,11 +91,9 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 		conn.Err = errors.New("User not recognised: " + conn.Name)
 
-		conn.Send(sock.Msg{
-			Id:   "",
-			Op:   "error",
-			Args: []string{"unknown_user"},
-		})
+		conn.Send2("", "error", struct {
+			Error string `json:"error"`
+		}{"unknown_user"})
 	})
 
 	mux.Handle("add", func(conn *sock.Conn, data []byte) {
@@ -177,33 +174,31 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 func (r *Room) initOp(conn *sock.Conn) {
 	if r.stage != "" {
-		conn.Send(sock.Msg{
-			Id:   "",
-			Op:   "stage",
-			Args: []string{r.stage},
-		})
+		conn.Send2("", "stage", struct {
+			Stage string `json:"stage"`
+		}{r.stage})
 	}
 
 	for _, column := range r.retro.Columns() {
-		conn.Send(sock.Msg{
-			Id:   "",
-			Op:   "column",
-			Args: []string{column.Id, column.Name},
-		})
+		conn.Send2("", "column", struct {
+			ColumnId   string `json:"columnId"`
+			ColumnName string `json:"columnName"`
+		}{column.Id, column.Name})
 
 		for cardId, card := range column.Cards() {
-			conn.Send(sock.Msg{
-				Id:   "",
-				Op:   "card",
-				Args: []string{column.Id, cardId, boolToString(card.Revealed), strconv.Itoa(card.Votes)},
-			})
+			conn.Send2("", "card", struct {
+				ColumnId string `json:"columnId"`
+				CardId   string `json:"cardId"`
+				Revealed bool   `json:"revealed"`
+				Votes    int    `json:"votes"`
+			}{column.Id, cardId, card.Revealed, card.Votes})
 
 			for _, content := range card.Contents() {
-				conn.Send(sock.Msg{
-					Id:   content.Author,
-					Op:   "content",
-					Args: []string{column.Id, cardId, content.Text},
-				})
+				conn.Send2(content.Author, "content", struct {
+					ColumnId string `json:"columnId"`
+					CardId   string `json:"cardId"`
+					CardText string `json:"cardText"`
+				}{column.Id, cardId, content.Text})
 			}
 		}
 	}
@@ -225,17 +220,18 @@ func (r *Room) addOp(conn *sock.Conn, columnId, cardText string) {
 
 	r.retro.Get(columnId).Add(card)
 
-	conn.Broadcast(sock.Msg{
-		Id:   "",
-		Op:   "card",
-		Args: []string{columnId, card.Id, boolToString(card.Revealed), strconv.Itoa(card.Votes)},
-	})
+	conn.Broadcast2("", "card", struct {
+		ColumnId string `json:"columnId"`
+		CardId   string `json:"cardId"`
+		Revealed bool   `json:"revealed"`
+		Votes    int    `json:"votes"`
+	}{columnId, card.Id, card.Revealed, card.Votes})
 
-	conn.Broadcast(sock.Msg{
-		Id:   content.Author,
-		Op:   "content",
-		Args: []string{columnId, card.Id, content.Text},
-	})
+	conn.Broadcast2(content.Author, "content", struct {
+		ColumnId string `json:"columnId"`
+		CardId   string `json:"cardId"`
+		CardText string `json:"cardText"`
+	}{columnId, card.Id, content.Text})
 }
 
 func (r *Room) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
@@ -244,31 +240,28 @@ func (r *Room) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
 	r.retro.Get(columnTo).Add(target)
 	r.retro.Get(columnFrom).Remove(cardId)
 
-	conn.Broadcast(sock.Msg{
-		Id:   conn.Name,
-		Op:   "move",
-		Args: []string{columnFrom, columnTo, cardId},
-	})
+	conn.Broadcast2(conn.Name, "move", struct {
+		ColumnFrom string `json:"columnFrom"`
+		ColumnTo   string `json:"columnTo"`
+		CardId     string `json:"cardId"`
+	}{columnFrom, columnTo, cardId})
 }
 
 func (r *Room) stageOp(conn *sock.Conn, stage string) {
 	r.stage = stage
 
-	conn.Broadcast(sock.Msg{
-		Id:   conn.Name,
-		Op:   "stage",
-		Args: []string{stage},
-	})
+	conn.Broadcast2(conn.Name, "stage", struct {
+		Stage string `json:"stage"`
+	}{stage})
 }
 
 func (r *Room) revealOp(conn *sock.Conn, columnId, cardId string) {
 	r.retro.GetCard(columnId, cardId).Revealed = true
 
-	conn.Broadcast(sock.Msg{
-		Id:   conn.Name,
-		Op:   "reveal",
-		Args: []string{columnId, cardId},
-	})
+	conn.Broadcast2(conn.Name, "reveal", struct {
+		ColumnId string `json:"columnId"`
+		CardId   string `json:"cardId"`
+	}{columnId, cardId})
 }
 
 func (r *Room) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo string) {
@@ -281,21 +274,21 @@ func (r *Room) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo s
 		to.Add(content)
 	}
 
-	conn.Broadcast(sock.Msg{
-		Id:   conn.Name,
-		Op:   "group",
-		Args: []string{columnFrom, cardFrom, columnTo, cardTo},
-	})
+	conn.Broadcast2(conn.Name, "group", struct {
+		ColumnFrom string `json:"columnFrom"`
+		CardFrom   string `json:"cardFrom"`
+		ColumnTo   string `json:"columnTo"`
+		CardTo     string `json:"cardTo"`
+	}{columnFrom, cardFrom, columnTo, cardTo})
 }
 
 func (r *Room) voteOp(conn *sock.Conn, columnId, cardId string) {
 	r.retro.GetCard(columnId, cardId).Votes += 1
 
-	conn.Broadcast(sock.Msg{
-		Id:   conn.Name,
-		Op:   "vote",
-		Args: []string{columnId, cardId},
-	})
+	conn.Broadcast2(conn.Name, "vote", struct {
+		ColumnId string `json:"columnId"`
+		CardId   string `json:"cardId"`
+	}{columnId, cardId})
 }
 
 func main() {

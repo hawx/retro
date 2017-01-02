@@ -9,9 +9,6 @@ type Msg struct {
 	// Op is the name of the operation being carried out.
 	Op string `json:"op"`
 
-	// Args is a list of arguments for the operation.
-	Args []string `json:"args"`
-
 	// Data is anything useful, encoded in a string, hopefully in JSON.
 	Data string `json:"data"`
 }
