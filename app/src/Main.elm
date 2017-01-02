@@ -77,8 +77,6 @@ type Msg = SetId (Maybe String)
          | ChangeInput String String
          | SetStage Stage
          | Reveal String String
-         | ChangeName String
-         | Join
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
 
@@ -87,25 +85,22 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         Vote columnId cardId ->
-            model ! [ Sock.send (webSocketUrl model.flags) model.user "vote" [columnId, cardId] ]
-
-        ChangeName name ->
-            { model | user = name } ! []
-        Join ->
-            { model | joined = True } ! [ Sock.send (webSocketUrl model.flags) model.user "init" [model.user] ]
+            model ! [ Sock.vote (webSocketUrl model.flags) model.user columnId cardId ]
 
         SetId (Just parts) ->
             case String.split ";" parts of
                 [id, token] ->
-                    { model | user = id, joined = True } ! [ Sock.send (webSocketUrl model.flags) id "init" [id, token] ]
+                    { model | user = id, joined = True } !
+                        [ Sock.init (webSocketUrl model.flags) id id token ]
                 _ ->
                     { model | user = "", joined = False } ! []
 
         SetStage stage ->
-            { model | stage = stage } ! [ Sock.send (webSocketUrl model.flags) model.user "stage" [toString stage] ]
+            { model | stage = stage } !
+                [ Sock.stage (webSocketUrl model.flags) model.user (toString stage) ]
 
         Reveal columnId cardId ->
-            model ! [ Sock.send (webSocketUrl model.flags) model.user "reveal" [columnId, cardId] ]
+            model ! [ Sock.reveal (webSocketUrl model.flags) model.user columnId cardId ]
 
         DnD subMsg ->
             case DragAndDrop.isDrop subMsg model.dnd of
@@ -113,7 +108,8 @@ update msg model =
                     case model.stage of
                         Thinking ->
                             if columnFrom /= columnTo then
-                                { model | dnd = DragAndDrop.empty } ! [ Sock.send (webSocketUrl model.flags) model.user "move" [columnFrom, columnTo, cardFrom] ]
+                                { model | dnd = DragAndDrop.empty } !
+                                    [ Sock.move (webSocketUrl model.flags) model.user columnFrom columnTo cardFrom ]
                             else
                                 model ! []
 
@@ -121,7 +117,7 @@ update msg model =
                             case maybeCardTo of
                                 Just cardTo ->
                                     if cardFrom /= cardTo then
-                                        { model | dnd = DragAndDrop.empty } ! [ Sock.send (webSocketUrl model.flags) model.user "group" [columnFrom, cardFrom, columnTo, cardTo ] ]
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.group (webSocketUrl model.flags) model.user columnFrom cardFrom columnTo cardTo ]
                                     else
                                         model ! []
                                 Nothing ->
@@ -135,7 +131,8 @@ update msg model =
 
         ChangeInput columnId input ->
             if String.endsWith "\n" input && String.trim model.input /= "" then
-                { model | input = "" } ! [ Sock.send (webSocketUrl model.flags) model.user "add" [columnId, model.input] ]
+                { model | input = "" } !
+                    [ Sock.add (webSocketUrl model.flags) model.user columnId model.input ]
             else
                 { model | input = String.trim input } ! []
 
@@ -145,10 +142,10 @@ update msg model =
         _ ->
             model ! []
 
-socketUpdate : Sock.SocketMsg -> Model -> (Model, Cmd Msg)
-socketUpdate msg model =
-    case (msg.op, msg.args) of
-        ("stage", [stage]) ->
+socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
+socketUpdate (id, msgData) model =
+    case msgData of
+        Sock.Stage { stage } ->
             case stage of
                 "Thinking" -> { model | stage = Thinking } ! []
                 "Presenting" -> { model | stage = Presenting } ! []
@@ -156,53 +153,47 @@ socketUpdate msg model =
                 "Discussing" -> { model | stage = Discussing } ! []
                 _ -> model ! []
 
-        ("card", [columnId, cardId, cardRevealed, cardVotes]) ->
-            case String.toInt cardVotes of
-                Ok votes ->
-                    let
-                        card =
-                            { id = cardId
-                            , votes = votes
-                            , revealed = cardRevealed == "true"
-                            , contents = [ ]
-                            }
-                    in
-                        { model | retro = Retro.addCard columnId card model.retro } ! []
-                Err e ->
-                    Debug.log (toString e) (model ! [])
+        Sock.Card { columnId, cardId, revealed, votes } ->
+            let
+                card =
+                    { id = cardId
+                    , votes = votes
+                    , revealed = revealed
+                    , contents = [ ]
+                    }
+            in
+                { model | retro = Retro.addCard columnId card model.retro } ! []
 
-        ("content", [columnId, cardId, contentText]) ->
+        Sock.Content { columnId, cardId, cardText } ->
             let content =
                     { id = ""
-                    , text = contentText
-                    , author = msg.id
+                    , text = cardText
+                    , author = id
                     }
             in
                 { model | retro = Retro.addContent columnId cardId content model.retro } ! []
 
-        ("column", [columnId, columnName]) ->
+        Sock.Column { columnId, columnName } ->
             let
                 column = { id = columnId, name = columnName, cards = Dict.empty }
             in
                 { model | retro = Retro.addColumn column model.retro } ! []
 
-        ("move", [columnFrom, columnTo, cardId]) ->
+        Sock.Move { columnFrom, columnTo, cardId } ->
             { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
 
-        ("reveal", [columnId, cardId]) ->
+        Sock.Reveal { columnId, cardId } ->
             { model | retro = Retro.revealCard columnId cardId model.retro } ! []
 
-        ("group",[columnFrom, cardFrom, columnTo, cardTo]) ->
+        Sock.Group { columnFrom, cardFrom, columnTo, cardTo } ->
             { model | retro = Retro.groupCards (columnFrom, cardFrom) (columnTo, cardTo) model.retro } ! []
 
-        ("vote", [columnId, cardId]) ->
+        Sock.Vote { columnId, cardId } ->
             { model | retro = Retro.voteCard columnId cardId model.retro } ! []
 
-        ("error", [error]) ->
+        Sock.Error { error } ->
             handleError error model
 
-        missing ->
-            Debug.log (toString missing) (model ! [])
 
 handleError : String -> Model -> (Model, Cmd Msg)
 handleError error model =

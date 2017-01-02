@@ -8,19 +8,19 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-type Hub struct {
+type hub struct {
 	mu          sync.RWMutex
 	connections map[*Conn]struct{}
 }
 
-func NewHub() *Hub {
-	return &Hub{
+func newHub() *hub {
+	return &hub{
 		connections: map[*Conn]struct{}{},
 	}
 }
 
 // AddConnection adds a new connection to the hub, and returns the connection.
-func (h *Hub) AddConnection(ws *websocket.Conn) *Conn {
+func (h *hub) addConnection(ws *websocket.Conn) *Conn {
 	conn := &Conn{
 		Name: "",
 		Err:  nil,
@@ -35,17 +35,17 @@ func (h *Hub) AddConnection(ws *websocket.Conn) *Conn {
 	return conn
 }
 
-func (h *Hub) RemoveConnection(conn *Conn) {
+func (h *hub) removeConnection(conn *Conn) {
 	h.mu.Lock()
 	delete(h.connections, conn)
 	h.mu.Unlock()
 }
 
-func (h *Hub) broadcast(msg Msg) {
+func (h *hub) broadcast(msg Msg) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	for conn, _ := range h.connections {
-		websocket.JSON.Send(conn.ws, msg)
+		conn.send(msg)
 	}
 }
