@@ -84,16 +84,45 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 		conn.Name = args.Name
 
-		if r.IsUser(args.Name, args.Token) {
-			r.initOp(conn)
+		if !r.IsUser(args.Name, args.Token) {
+			conn.Err = errors.New("User not recognised: " + conn.Name)
+
+			conn.Send("", "error", struct {
+				Error string `json:"error"`
+			}{"unknown_user"})
+
 			return
 		}
 
-		conn.Err = errors.New("User not recognised: " + conn.Name)
+		if r.stage != "" {
+			conn.Send("", "stage", struct {
+				Stage string `json:"stage"`
+			}{r.stage})
+		}
 
-		conn.Send("", "error", struct {
-			Error string `json:"error"`
-		}{"unknown_user"})
+		for _, column := range r.retro.Columns() {
+			conn.Send("", "column", struct {
+				ColumnId   string `json:"columnId"`
+				ColumnName string `json:"columnName"`
+			}{column.Id, column.Name})
+
+			for cardId, card := range column.Cards() {
+				conn.Send("", "card", struct {
+					ColumnId string `json:"columnId"`
+					CardId   string `json:"cardId"`
+					Revealed bool   `json:"revealed"`
+					Votes    int    `json:"votes"`
+				}{column.Id, cardId, card.Revealed, card.Votes})
+
+				for _, content := range card.Contents() {
+					conn.Send(content.Author, "content", struct {
+						ColumnId string `json:"columnId"`
+						CardId   string `json:"cardId"`
+						CardText string `json:"cardText"`
+					}{column.Id, cardId, content.Text})
+				}
+			}
+		}
 	})
 
 	mux.Handle("add", func(conn *sock.Conn, data []byte) {
@@ -106,7 +135,33 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.addOp(conn, args.ColumnId, args.CardText)
+		content := models.Content{
+			Text:   args.CardText,
+			Author: conn.Name,
+		}
+
+		card := &models.Card{
+			Id:       strId(),
+			Votes:    0,
+			Revealed: false,
+		}
+
+		card.Add(content)
+
+		r.retro.Get(args.ColumnId).Add(card)
+
+		conn.Broadcast("", "card", struct {
+			ColumnId string `json:"columnId"`
+			CardId   string `json:"cardId"`
+			Revealed bool   `json:"revealed"`
+			Votes    int    `json:"votes"`
+		}{args.ColumnId, card.Id, card.Revealed, card.Votes})
+
+		conn.Broadcast(content.Author, "content", struct {
+			ColumnId string `json:"columnId"`
+			CardId   string `json:"cardId"`
+			CardText string `json:"cardText"`
+		}{args.ColumnId, card.Id, content.Text})
 	})
 
 	mux.Handle("move", func(conn *sock.Conn, data []byte) {
@@ -119,7 +174,16 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.moveOp(conn, args.ColumnFrom, args.ColumnTo, args.CardId)
+		target := r.retro.GetCard(args.ColumnFrom, args.CardId)
+
+		r.retro.Get(args.ColumnTo).Add(target)
+		r.retro.Get(args.ColumnFrom).Remove(args.CardId)
+
+		conn.Broadcast(conn.Name, "move", struct {
+			ColumnFrom string `json:"columnFrom"`
+			ColumnTo   string `json:"columnTo"`
+			CardId     string `json:"cardId"`
+		}{args.ColumnFrom, args.ColumnTo, args.CardId})
 	})
 
 	mux.Handle("stage", func(conn *sock.Conn, data []byte) {
@@ -130,7 +194,11 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.stageOp(conn, args.Stage)
+		r.stage = args.Stage
+
+		conn.Broadcast(conn.Name, "stage", struct {
+			Stage string `json:"stage"`
+		}{args.Stage})
 	})
 
 	mux.Handle("reveal", func(conn *sock.Conn, data []byte) {
@@ -142,7 +210,12 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.revealOp(conn, args.ColumnId, args.CardId)
+		r.retro.GetCard(args.ColumnId, args.CardId).Revealed = true
+
+		conn.Broadcast(conn.Name, "reveal", struct {
+			ColumnId string `json:"columnId"`
+			CardId   string `json:"cardId"`
+		}{args.ColumnId, args.CardId})
 	})
 
 	mux.Handle("group", func(conn *sock.Conn, data []byte) {
@@ -156,7 +229,22 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.groupOp(conn, args.ColumnFrom, args.CardFrom, args.ColumnTo, args.CardTo)
+		from := r.retro.GetCard(args.ColumnFrom, args.CardFrom)
+		to := r.retro.GetCard(args.ColumnTo, args.CardTo)
+
+		to.Votes += from.Votes
+		r.retro.Get(args.ColumnFrom).Remove(args.CardFrom)
+
+		for _, content := range from.Contents() {
+			to.Add(content)
+		}
+
+		conn.Broadcast(conn.Name, "group", struct {
+			ColumnFrom string `json:"columnFrom"`
+			CardFrom   string `json:"cardFrom"`
+			ColumnTo   string `json:"columnTo"`
+			CardTo     string `json:"cardTo"`
+		}{args.ColumnFrom, args.CardFrom, args.ColumnTo, args.CardTo})
 	})
 
 	mux.Handle("vote", func(conn *sock.Conn, data []byte) {
@@ -168,128 +256,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.voteOp(conn, args.ColumnId, args.CardId)
+		r.retro.GetCard(args.ColumnId, args.CardId).Votes += 1
+
+		conn.Broadcast(conn.Name, "vote", struct {
+			ColumnId string `json:"columnId"`
+			CardId   string `json:"cardId"`
+		}{args.ColumnId, args.CardId})
 	})
-}
-
-func (r *Room) initOp(conn *sock.Conn) {
-	if r.stage != "" {
-		conn.Send("", "stage", struct {
-			Stage string `json:"stage"`
-		}{r.stage})
-	}
-
-	for _, column := range r.retro.Columns() {
-		conn.Send("", "column", struct {
-			ColumnId   string `json:"columnId"`
-			ColumnName string `json:"columnName"`
-		}{column.Id, column.Name})
-
-		for cardId, card := range column.Cards() {
-			conn.Send("", "card", struct {
-				ColumnId string `json:"columnId"`
-				CardId   string `json:"cardId"`
-				Revealed bool   `json:"revealed"`
-				Votes    int    `json:"votes"`
-			}{column.Id, cardId, card.Revealed, card.Votes})
-
-			for _, content := range card.Contents() {
-				conn.Send(content.Author, "content", struct {
-					ColumnId string `json:"columnId"`
-					CardId   string `json:"cardId"`
-					CardText string `json:"cardText"`
-				}{column.Id, cardId, content.Text})
-			}
-		}
-	}
-}
-
-func (r *Room) addOp(conn *sock.Conn, columnId, cardText string) {
-	content := models.Content{
-		Text:   cardText,
-		Author: conn.Name,
-	}
-
-	card := &models.Card{
-		Id:       strId(),
-		Votes:    0,
-		Revealed: false,
-	}
-
-	card.Add(content)
-
-	r.retro.Get(columnId).Add(card)
-
-	conn.Broadcast("", "card", struct {
-		ColumnId string `json:"columnId"`
-		CardId   string `json:"cardId"`
-		Revealed bool   `json:"revealed"`
-		Votes    int    `json:"votes"`
-	}{columnId, card.Id, card.Revealed, card.Votes})
-
-	conn.Broadcast(content.Author, "content", struct {
-		ColumnId string `json:"columnId"`
-		CardId   string `json:"cardId"`
-		CardText string `json:"cardText"`
-	}{columnId, card.Id, content.Text})
-}
-
-func (r *Room) moveOp(conn *sock.Conn, columnFrom, columnTo, cardId string) {
-	target := r.retro.GetCard(columnFrom, cardId)
-
-	r.retro.Get(columnTo).Add(target)
-	r.retro.Get(columnFrom).Remove(cardId)
-
-	conn.Broadcast(conn.Name, "move", struct {
-		ColumnFrom string `json:"columnFrom"`
-		ColumnTo   string `json:"columnTo"`
-		CardId     string `json:"cardId"`
-	}{columnFrom, columnTo, cardId})
-}
-
-func (r *Room) stageOp(conn *sock.Conn, stage string) {
-	r.stage = stage
-
-	conn.Broadcast(conn.Name, "stage", struct {
-		Stage string `json:"stage"`
-	}{stage})
-}
-
-func (r *Room) revealOp(conn *sock.Conn, columnId, cardId string) {
-	r.retro.GetCard(columnId, cardId).Revealed = true
-
-	conn.Broadcast(conn.Name, "reveal", struct {
-		ColumnId string `json:"columnId"`
-		CardId   string `json:"cardId"`
-	}{columnId, cardId})
-}
-
-func (r *Room) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo string) {
-	from := r.retro.GetCard(columnFrom, cardFrom)
-	to := r.retro.GetCard(columnTo, cardTo)
-
-	to.Votes += from.Votes
-	r.retro.Get(columnFrom).Remove(cardFrom)
-
-	for _, content := range from.Contents() {
-		to.Add(content)
-	}
-
-	conn.Broadcast(conn.Name, "group", struct {
-		ColumnFrom string `json:"columnFrom"`
-		CardFrom   string `json:"cardFrom"`
-		ColumnTo   string `json:"columnTo"`
-		CardTo     string `json:"cardTo"`
-	}{columnFrom, cardFrom, columnTo, cardTo})
-}
-
-func (r *Room) voteOp(conn *sock.Conn, columnId, cardId string) {
-	r.retro.GetCard(columnId, cardId).Votes += 1
-
-	conn.Broadcast(conn.Name, "vote", struct {
-		ColumnId string `json:"columnId"`
-		CardId   string `json:"cardId"`
-	}{columnId, cardId})
 }
 
 func main() {
