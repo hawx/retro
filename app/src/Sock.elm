@@ -1,6 +1,5 @@
 module Sock exposing ( listen
                      , update
-                     , SocketMsg
                      , init
                      , add
                      , move
