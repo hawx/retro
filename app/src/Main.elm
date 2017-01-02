@@ -142,9 +142,9 @@ update msg model =
         _ ->
             model ! []
 
-socketUpdate : Sock.SocketMsg -> Model -> (Model, Cmd Msg)
-socketUpdate msg model =
-    case (msg.op, msg.args) of
+socketUpdate : (String, String, List String) -> Model -> (Model, Cmd Msg)
+socketUpdate (id, op, args) model =
+    case (op, args) of
         ("stage", [stage]) ->
             case stage of
                 "Thinking" -> { model | stage = Thinking } ! []
@@ -172,7 +172,7 @@ socketUpdate msg model =
             let content =
                     { id = ""
                     , text = contentText
-                    , author = msg.id
+                    , author = id
                     }
             in
                 { model | retro = Retro.addContent columnId cardId content model.retro } ! []
