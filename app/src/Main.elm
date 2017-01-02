@@ -77,8 +77,6 @@ type Msg = SetId (Maybe String)
          | ChangeInput String String
          | SetStage Stage
          | Reveal String String
-         | ChangeName String
-         | Join
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
 
@@ -87,25 +85,22 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         Vote columnId cardId ->
-            model ! [ Sock.send (webSocketUrl model.flags) model.user "vote" [columnId, cardId] ]
-
-        ChangeName name ->
-            { model | user = name } ! []
-        Join ->
-            { model | joined = True } ! [ Sock.send (webSocketUrl model.flags) model.user "init" [model.user] ]
+            model ! [ Sock.vote (webSocketUrl model.flags) model.user columnId cardId ]
 
         SetId (Just parts) ->
             case String.split ";" parts of
                 [id, token] ->
-                    { model | user = id, joined = True } ! [ Sock.send (webSocketUrl model.flags) id "init" [id, token] ]
+                    { model | user = id, joined = True } !
+                        [ Sock.init (webSocketUrl model.flags) id id token ]
                 _ ->
                     { model | user = "", joined = False } ! []
 
         SetStage stage ->
-            { model | stage = stage } ! [ Sock.send (webSocketUrl model.flags) model.user "stage" [toString stage] ]
+            { model | stage = stage } !
+                [ Sock.stage (webSocketUrl model.flags) model.user (toString stage) ]
 
         Reveal columnId cardId ->
-            model ! [ Sock.send (webSocketUrl model.flags) model.user "reveal" [columnId, cardId] ]
+            model ! [ Sock.reveal (webSocketUrl model.flags) model.user columnId cardId ]
 
         DnD subMsg ->
             case DragAndDrop.isDrop subMsg model.dnd of
@@ -113,7 +108,8 @@ update msg model =
                     case model.stage of
                         Thinking ->
                             if columnFrom /= columnTo then
-                                { model | dnd = DragAndDrop.empty } ! [ Sock.send (webSocketUrl model.flags) model.user "move" [columnFrom, columnTo, cardFrom] ]
+                                { model | dnd = DragAndDrop.empty } !
+                                    [ Sock.move (webSocketUrl model.flags) model.user columnFrom columnTo cardFrom ]
                             else
                                 model ! []
 
@@ -121,7 +117,7 @@ update msg model =
                             case maybeCardTo of
                                 Just cardTo ->
                                     if cardFrom /= cardTo then
-                                        { model | dnd = DragAndDrop.empty } ! [ Sock.send (webSocketUrl model.flags) model.user "group" [columnFrom, cardFrom, columnTo, cardTo ] ]
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.group (webSocketUrl model.flags) model.user columnFrom cardFrom columnTo cardTo ]
                                     else
                                         model ! []
                                 Nothing ->
@@ -135,7 +131,8 @@ update msg model =
 
         ChangeInput columnId input ->
             if String.endsWith "\n" input && String.trim model.input /= "" then
-                { model | input = "" } ! [ Sock.send (webSocketUrl model.flags) model.user "add" [columnId, model.input] ]
+                { model | input = "" } !
+                    [ Sock.add (webSocketUrl model.flags) model.user columnId model.input ]
             else
                 { model | input = String.trim input } ! []
 

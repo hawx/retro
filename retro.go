@@ -73,74 +73,105 @@ func (r *Room) IsUser(user, token string) bool {
 }
 
 func registerHandlers(r *Room, mux *sock.Server) {
-	mux.Handle("init", func(conn *sock.Conn, args []string) {
-		if len(args) == 2 {
-			conn.Name = args[0]
-			token := args[1]
+	mux.Handle("init", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			Name  string
+			Token string
+		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			log.Println("init:", err)
+			return
+		}
 
-			if !r.IsUser(conn.Name, token) {
-				conn.Err = errors.New("User not recognised: " + conn.Name)
+		conn.Name = args.Name
 
-				conn.Send(sock.Msg{
-					Id:   "",
-					Op:   "error",
-					Args: []string{"unknown_user"},
-				})
-
-				return
-			}
-
+		if r.IsUser(args.Name, args.Token) {
 			r.initOp(conn)
+			return
 		}
+
+		conn.Err = errors.New("User not recognised: " + conn.Name)
+
+		conn.Send(sock.Msg{
+			Id:   "",
+			Op:   "error",
+			Args: []string{"unknown_user"},
+		})
 	})
 
-	mux.Handle("add", func(conn *sock.Conn, args []string) {
-		if len(args) == 2 {
-			columnId, cardText := args[0], args[1]
-
-			r.addOp(conn, columnId, cardText)
+	mux.Handle("add", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			ColumnId string
+			CardText string
 		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			log.Println("add:", err)
+			return
+		}
+
+		r.addOp(conn, args.ColumnId, args.CardText)
 	})
 
-	mux.Handle("move", func(conn *sock.Conn, args []string) {
-		if len(args) == 3 {
-			columnFrom, columnTo, cardId := args[0], args[1], args[2]
-
-			r.moveOp(conn, columnFrom, columnTo, cardId)
+	mux.Handle("move", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			ColumnFrom string
+			ColumnTo   string
+			CardId     string
 		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.moveOp(conn, args.ColumnFrom, args.ColumnTo, args.CardId)
 	})
 
-	mux.Handle("stage", func(conn *sock.Conn, args []string) {
-		if len(args) == 1 {
-			stage := args[0]
-
-			r.stageOp(conn, stage)
+	mux.Handle("stage", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			Stage string
 		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.stageOp(conn, args.Stage)
 	})
 
-	mux.Handle("reveal", func(conn *sock.Conn, args []string) {
-		if len(args) == 2 {
-			// this really shouldn't take columnId...
-			columnId, cardId := args[0], args[1]
-
-			r.revealOp(conn, columnId, cardId)
+	mux.Handle("reveal", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			ColumnId string // shouldn't really need columnId
+			CardId   string
 		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.revealOp(conn, args.ColumnId, args.CardId)
 	})
 
-	mux.Handle("group", func(conn *sock.Conn, args []string) {
-		if len(args) == 4 {
-			columnFrom, cardFrom, columnTo, cardTo := args[0], args[1], args[2], args[3]
-
-			r.groupOp(conn, columnFrom, cardFrom, columnTo, cardTo)
+	mux.Handle("group", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			ColumnFrom string
+			CardFrom   string
+			ColumnTo   string
+			CardTo     string
 		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.groupOp(conn, args.ColumnFrom, args.CardFrom, args.ColumnTo, args.CardTo)
 	})
 
-	mux.Handle("vote", func(conn *sock.Conn, args []string) {
-		if len(args) == 2 {
-			columnId, cardId := args[0], args[1]
-
-			r.voteOp(conn, columnId, cardId)
+	mux.Handle("vote", func(conn *sock.Conn, data []byte) {
+		var args struct {
+			ColumnId string
+			CardId   string
 		}
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.voteOp(conn, args.ColumnId, args.CardId)
 	})
 }
 

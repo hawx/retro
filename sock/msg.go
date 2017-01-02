@@ -11,4 +11,7 @@ type Msg struct {
 
 	// Args is a list of arguments for the operation.
 	Args []string `json:"args"`
+
+	// Data is anything useful, encoded in a string, hopefully in JSON.
+	Data string `json:"data"`
 }

@@ -2,7 +2,7 @@ package sock
 
 import "golang.org/x/net/websocket"
 
-type Handler func(conn *Conn, args []string)
+type Handler func(conn *Conn, data []byte)
 
 type mux struct {
 	// I'm trusting you not to insert handlers once Serve is called...
@@ -31,7 +31,7 @@ func (m *mux) serve(conn *Conn) error {
 			continue
 		}
 
-		handler(conn, msg.Args)
+		handler(conn, []byte(msg.Data))
 		if conn.Err != nil {
 			return conn.Err
 		}
