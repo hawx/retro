@@ -13,34 +13,30 @@ type Conn struct {
 	ws   *websocket.Conn
 }
 
-func (c *Conn) Send(msg Msg) error {
+func (c *Conn) send(msg Msg) error {
 	return websocket.JSON.Send(c.ws, msg)
 }
 
-func (c *Conn) Send2(id, op string, v interface{}) error {
+func (c *Conn) Send(id, op string, v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 
-	return c.Send(Msg{
+	return c.send(Msg{
 		Id:   id,
 		Op:   op,
 		Data: string(data),
 	})
 }
 
-func (c *Conn) Broadcast(msg Msg) {
-	c.hub.broadcast(msg)
-}
-
-func (c *Conn) Broadcast2(id, op string, v interface{}) {
+func (c *Conn) Broadcast(id, op string, v interface{}) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return
 	}
 
-	c.Broadcast(Msg{
+	c.hub.broadcast(Msg{
 		Id:   id,
 		Op:   op,
 		Data: string(data),

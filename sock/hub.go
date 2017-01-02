@@ -46,6 +46,6 @@ func (h *hub) broadcast(msg Msg) {
 	defer h.mu.Unlock()
 
 	for conn, _ := range h.connections {
-		conn.Send(msg)
+		conn.send(msg)
 	}
 }
