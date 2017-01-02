@@ -8,10 +8,8 @@ module Sock exposing ( listen
                      , reveal
                      , group
                      , vote
-                     , update2
                      , MsgData(..))
 
-import Debug
 import WebSocket
 import Json.Encode as Encode
 import Json.Decode as Decode
@@ -135,14 +133,14 @@ listen : String -> (String -> msg) -> Sub msg
 listen url tagger =
     WebSocket.listen url tagger
 
-update : String -> model -> ((String, String, List String, String) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
-update data model f =
+update_ : String -> model -> ((String, String, List String, String) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
+update_ data model f =
     case Decode.decodeString socketMsgDecoder data of
         Ok socketMsg -> f (socketMsg.id, socketMsg.op, [], socketMsg.data) model
         Err _ -> (model, Cmd.none)
 
-update2 : String -> model -> ((String, MsgData) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
-update2 data model2 f =
+update : String -> model -> ((String, MsgData) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
+update data model2 f =
     let
         g (id, op, args, data2) model =
             case op of
@@ -184,7 +182,7 @@ update2 data model2 f =
                 "vote" ->
                     case Decode.decodeString voteDecoder data2 of
                         Ok thing -> f (id, Vote thing) model
-                        Err e -> Debug.log e (model, Cmd.none)
+                        Err _ -> (model, Cmd.none)
 
                 "error" ->
                     case Decode.decodeString errorDecoder data2 of
@@ -193,7 +191,7 @@ update2 data model2 f =
 
                 _ -> (model, Cmd.none)
     in
-        update data model2 g
+        update_ data model2 g
 
 init : String -> String -> String -> String -> Cmd msg
 init url id name token =

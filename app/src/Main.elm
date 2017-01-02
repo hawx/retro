@@ -137,7 +137,7 @@ update msg model =
                 { model | input = String.trim input } ! []
 
         Socket data ->
-            Sock.update2 data model socketUpdate
+            Sock.update data model socketUpdate
 
         _ ->
             model ! []
