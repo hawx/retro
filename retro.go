@@ -30,6 +30,55 @@ type msg struct {
 	Args []string `json:"args"`
 }
 
+type errorData struct {
+	Error string `json:"error"`
+}
+
+type stageData struct {
+	Stage string `json:"stage"`
+}
+
+type columnData struct {
+	ColumnId   string `json:"columnId"`
+	ColumnName string `json:"columnName"`
+}
+
+type cardData struct {
+	ColumnId string `json:"columnId"`
+	CardId   string `json:"cardId"`
+	Revealed bool   `json:"revealed"`
+	Votes    int    `json:"votes"`
+}
+
+type contentData struct {
+	ColumnId string `json:"columnId"`
+	CardId   string `json:"cardId"`
+	CardText string `json:"cardText"`
+}
+
+type moveData struct {
+	ColumnFrom string `json:"columnFrom"`
+	ColumnTo   string `json:"columnTo"`
+	CardId     string `json:"cardId"`
+}
+
+type revealData struct {
+	ColumnId string `json:"columnId"`
+	CardId   string `json:"cardId"`
+}
+
+type groupData struct {
+	ColumnFrom string `json:"columnFrom"`
+	CardFrom   string `json:"cardFrom"`
+	ColumnTo   string `json:"columnTo"`
+	CardTo     string `json:"cardTo"`
+}
+
+type voteData struct {
+	ColumnId string `json:"columnId"`
+	CardId   string `json:"cardId"`
+}
+
 type Room struct {
 	stage  string
 	server *sock.Server
@@ -86,40 +135,23 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 		if !r.IsUser(args.Name, args.Token) {
 			conn.Err = errors.New("User not recognised: " + conn.Name)
-
-			conn.Send("", "error", struct {
-				Error string `json:"error"`
-			}{"unknown_user"})
+			conn.Send("", "error", errorData{"unknown_user"})
 
 			return
 		}
 
 		if r.stage != "" {
-			conn.Send("", "stage", struct {
-				Stage string `json:"stage"`
-			}{r.stage})
+			conn.Send("", "stage", stageData{r.stage})
 		}
 
 		for _, column := range r.retro.Columns() {
-			conn.Send("", "column", struct {
-				ColumnId   string `json:"columnId"`
-				ColumnName string `json:"columnName"`
-			}{column.Id, column.Name})
+			conn.Send("", "column", columnData{column.Id, column.Name})
 
 			for cardId, card := range column.Cards() {
-				conn.Send("", "card", struct {
-					ColumnId string `json:"columnId"`
-					CardId   string `json:"cardId"`
-					Revealed bool   `json:"revealed"`
-					Votes    int    `json:"votes"`
-				}{column.Id, cardId, card.Revealed, card.Votes})
+				conn.Send("", "card", cardData{column.Id, cardId, card.Revealed, card.Votes})
 
 				for _, content := range card.Contents() {
-					conn.Send(content.Author, "content", struct {
-						ColumnId string `json:"columnId"`
-						CardId   string `json:"cardId"`
-						CardText string `json:"cardText"`
-					}{column.Id, cardId, content.Text})
+					conn.Send(content.Author, "content", contentData{column.Id, cardId, content.Text})
 				}
 			}
 		}
@@ -150,26 +182,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 		r.retro.Get(args.ColumnId).Add(card)
 
-		conn.Broadcast("", "card", struct {
-			ColumnId string `json:"columnId"`
-			CardId   string `json:"cardId"`
-			Revealed bool   `json:"revealed"`
-			Votes    int    `json:"votes"`
-		}{args.ColumnId, card.Id, card.Revealed, card.Votes})
+		conn.Broadcast("", "card", cardData{args.ColumnId, card.Id, card.Revealed, card.Votes})
 
-		conn.Broadcast(content.Author, "content", struct {
-			ColumnId string `json:"columnId"`
-			CardId   string `json:"cardId"`
-			CardText string `json:"cardText"`
-		}{args.ColumnId, card.Id, content.Text})
+		conn.Broadcast(content.Author, "content", contentData{args.ColumnId, card.Id, content.Text})
 	})
 
 	mux.Handle("move", func(conn *sock.Conn, data []byte) {
-		var args struct {
-			ColumnFrom string
-			ColumnTo   string
-			CardId     string
-		}
+		var args moveData
 		if err := json.Unmarshal(data, &args); err != nil {
 			return
 		}
@@ -179,52 +198,33 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		r.retro.Get(args.ColumnTo).Add(target)
 		r.retro.Get(args.ColumnFrom).Remove(args.CardId)
 
-		conn.Broadcast(conn.Name, "move", struct {
-			ColumnFrom string `json:"columnFrom"`
-			ColumnTo   string `json:"columnTo"`
-			CardId     string `json:"cardId"`
-		}{args.ColumnFrom, args.ColumnTo, args.CardId})
+		conn.Broadcast(conn.Name, "move", args)
 	})
 
 	mux.Handle("stage", func(conn *sock.Conn, data []byte) {
-		var args struct {
-			Stage string
-		}
+		var args stageData
 		if err := json.Unmarshal(data, &args); err != nil {
 			return
 		}
 
 		r.stage = args.Stage
 
-		conn.Broadcast(conn.Name, "stage", struct {
-			Stage string `json:"stage"`
-		}{args.Stage})
+		conn.Broadcast(conn.Name, "stage", args)
 	})
 
 	mux.Handle("reveal", func(conn *sock.Conn, data []byte) {
-		var args struct {
-			ColumnId string // shouldn't really need columnId
-			CardId   string
-		}
+		var args revealData
 		if err := json.Unmarshal(data, &args); err != nil {
 			return
 		}
 
 		r.retro.GetCard(args.ColumnId, args.CardId).Revealed = true
 
-		conn.Broadcast(conn.Name, "reveal", struct {
-			ColumnId string `json:"columnId"`
-			CardId   string `json:"cardId"`
-		}{args.ColumnId, args.CardId})
+		conn.Broadcast(conn.Name, "reveal", args)
 	})
 
 	mux.Handle("group", func(conn *sock.Conn, data []byte) {
-		var args struct {
-			ColumnFrom string
-			CardFrom   string
-			ColumnTo   string
-			CardTo     string
-		}
+		var args groupData
 		if err := json.Unmarshal(data, &args); err != nil {
 			return
 		}
@@ -239,29 +239,18 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			to.Add(content)
 		}
 
-		conn.Broadcast(conn.Name, "group", struct {
-			ColumnFrom string `json:"columnFrom"`
-			CardFrom   string `json:"cardFrom"`
-			ColumnTo   string `json:"columnTo"`
-			CardTo     string `json:"cardTo"`
-		}{args.ColumnFrom, args.CardFrom, args.ColumnTo, args.CardTo})
+		conn.Broadcast(conn.Name, "group", args)
 	})
 
 	mux.Handle("vote", func(conn *sock.Conn, data []byte) {
-		var args struct {
-			ColumnId string
-			CardId   string
-		}
+		var args voteData
 		if err := json.Unmarshal(data, &args); err != nil {
 			return
 		}
 
 		r.retro.GetCard(args.ColumnId, args.CardId).Votes += 1
 
-		conn.Broadcast(conn.Name, "vote", struct {
-			ColumnId string `json:"columnId"`
-			CardId   string `json:"cardId"`
-		}{args.ColumnId, args.CardId})
+		conn.Broadcast(conn.Name, "vote", args)
 	})
 }
 
