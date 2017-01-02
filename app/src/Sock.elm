@@ -9,24 +9,15 @@ module Sock exposing ( listen
                      , vote
                      , MsgData(..))
 
-import WebSocket
+{-| This module provides a domain wrapper on top of the websocket format for the
+purposes of retro.
+-}
+
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Dict
-
-type alias SocketMsg =
-    { id : String
-    , op : String
-    , data : String
-    }
-
-socketMsgDecoder : Decode.Decoder SocketMsg
-socketMsgDecoder =
-    Pipeline.decode SocketMsg
-        |> Pipeline.required "id" Decode.string
-        |> Pipeline.required "op" Decode.string
-        |> Pipeline.required "data" Decode.string
+import Sock.LowLevel
 
 type MsgData = Error ErrorData
              | Stage StageData
@@ -114,24 +105,8 @@ voteDecoder =
         |> Pipeline.required "columnId" Decode.string
         |> Pipeline.required "cardId" Decode.string
 
-socketMsgEncoder : SocketMsg -> Encode.Value
-socketMsgEncoder value =
-    Encode.object
-        [ ("id", Encode.string value.id)
-        , ("op", Encode.string value.op)
-        , ("data", Encode.string value.data)
-        ]
-
-send : String -> String -> String -> Encode.Value -> Cmd msg
-send url id op data =
-    SocketMsg id op (Encode.encode 0 data)
-        |> socketMsgEncoder
-        |> Encode.encode 0
-        |> WebSocket.send url
-
 listen : String -> (String -> msg) -> Sub msg
-listen url tagger =
-    WebSocket.listen url tagger
+listen = Sock.LowLevel.listen
 
 update : String -> model -> ((String, MsgData) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
 update data model f =
@@ -161,13 +136,11 @@ update data model f =
                 Nothing ->
                     (model, Cmd.none)
     in
-        case Decode.decodeString socketMsgDecoder data of
-            Ok socketMsg -> runMux socketMsg model
-            Err _ -> (model, Cmd.none)
+        Sock.LowLevel.update data model runMux
 
 init : String -> String -> String -> String -> Cmd msg
 init url id name token =
-    send url id "init" <|
+    Sock.LowLevel.send url id "init" <|
         Encode.object
             [ ("name", Encode.string name)
             , ("token", Encode.string token)
@@ -175,7 +148,7 @@ init url id name token =
 
 add : String -> String -> String -> String -> Cmd msg
 add url id columnId cardText =
-    send url id "add" <|
+    Sock.LowLevel.send url id "add" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardText", Encode.string cardText)
@@ -183,7 +156,7 @@ add url id columnId cardText =
 
 move : String -> String -> String -> String -> String -> Cmd msg
 move url id columnFrom columnTo cardId =
-    send url id "move" <|
+    Sock.LowLevel.send url id "move" <|
         Encode.object
             [ ("columnFrom", Encode.string columnFrom)
             , ("columnTo", Encode.string columnTo)
@@ -192,14 +165,14 @@ move url id columnFrom columnTo cardId =
 
 stage : String -> String -> String -> Cmd msg
 stage url id stage =
-    send url id "stage" <|
+    Sock.LowLevel.send url id "stage" <|
         Encode.object
             [ ("stage", Encode.string stage)
             ]
 
 reveal : String -> String -> String -> String -> Cmd msg
 reveal url id columnId cardId =
-    send url id "reveal" <|
+    Sock.LowLevel.send url id "reveal" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardId", Encode.string cardId)
@@ -207,7 +180,7 @@ reveal url id columnId cardId =
 
 group : String -> String -> String -> String -> String -> String -> Cmd msg
 group url id columnFrom cardFrom columnTo cardTo =
-    send url id "group" <|
+    Sock.LowLevel.send url id "group" <|
         Encode.object
             [ ("columnFrom", Encode.string columnFrom)
             , ("cardFrom", Encode.string cardFrom)
@@ -217,7 +190,7 @@ group url id columnFrom cardFrom columnTo cardTo =
 
 vote : String -> String -> String -> String -> Cmd msg
 vote url id columnId cardId =
-    send url id "vote" <|
+    Sock.LowLevel.send url id "vote" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardId", Encode.string cardId)

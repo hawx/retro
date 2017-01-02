@@ -268,6 +268,7 @@ func (r *Room) groupOp(conn *sock.Conn, columnFrom, cardFrom, columnTo, cardTo s
 	from := r.retro.GetCard(columnFrom, cardFrom)
 	to := r.retro.GetCard(columnTo, cardTo)
 
+	to.Votes += from.Votes
 	r.retro.Get(columnFrom).Remove(cardFrom)
 
 	for _, content := range from.Contents() {
