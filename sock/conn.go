@@ -5,7 +5,7 @@ import "golang.org/x/net/websocket"
 type Conn struct {
 	Name string
 	Err  error
-	hub  *Hub
+	hub  *hub
 	ws   *websocket.Conn
 }
 

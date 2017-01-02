@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,7 +17,6 @@ import (
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
 
-	"golang.org/x/net/websocket"
 	"golang.org/x/oauth2"
 )
 
@@ -34,10 +32,9 @@ type msg struct {
 }
 
 type Room struct {
-	stage string
-	hub   *sock.Hub
-	mux   *sock.Mux
-	retro *models.Retro
+	stage  string
+	server *sock.Server
+	retro  *models.Retro
 
 	mu    sync.RWMutex
 	users map[string]string
@@ -45,12 +42,12 @@ type Room struct {
 
 func NewRoom() *Room {
 	room := &Room{
-		hub:   sock.NewHub(),
-		retro: models.NewRetro(),
-		users: map[string]string{},
+		server: sock.NewServer(),
+		retro:  models.NewRetro(),
+		users:  map[string]string{},
 	}
 
-	room.mux = retroMux(room)
+	registerHandlers(room, room.server)
 
 	return room
 }
@@ -75,18 +72,7 @@ func (r *Room) IsUser(user, token string) bool {
 	return ok && token == expectedToken
 }
 
-func (r *Room) websocketHandler(ws *websocket.Conn) {
-	conn := r.hub.AddConnection(ws)
-	defer r.hub.RemoveConnection(conn)
-
-	if err := r.mux.Serve(conn); err != io.EOF {
-		log.Println(err)
-	}
-}
-
-func retroMux(r *Room) *sock.Mux {
-	mux := sock.NewMux()
-
+func registerHandlers(r *Room, mux *sock.Server) {
 	mux.Handle("init", func(conn *sock.Conn, args []string) {
 		if len(args) == 2 {
 			conn.Name = args[0]
@@ -156,8 +142,6 @@ func retroMux(r *Room) *sock.Mux {
 			r.voteOp(conn, columnId, cardId)
 		}
 	})
-
-	return mux
 }
 
 func (r *Room) initOp(conn *sock.Conn) {
@@ -304,7 +288,7 @@ func main() {
 
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 
-	http.Handle("/ws", websocket.Handler(room.websocketHandler))
+	http.Handle("/ws", room.server)
 
 	ctx := context.Background()
 	conf := &oauth2.Config{
