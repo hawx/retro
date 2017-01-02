@@ -133,12 +133,6 @@ listen : String -> (String -> msg) -> Sub msg
 listen url tagger =
     WebSocket.listen url tagger
 
-update_ : String -> model -> ((String, String, List String, String) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
-update_ data model f =
-    case Decode.decodeString socketMsgDecoder data of
-        Ok socketMsg -> f (socketMsg.id, socketMsg.op, [], socketMsg.data) model
-        Err _ -> (model, Cmd.none)
-
 update : String -> model -> ((String, MsgData) -> model -> (model, Cmd msg)) -> (model, Cmd msg)
 update data model f =
     let
@@ -159,7 +153,7 @@ update data model f =
               , ("error", runOp errorDecoder Error)
               ]
 
-        runMux (id, op, args, data) model =
+        runMux { id, op, data } model =
             case Dict.get op mux of
                 Just guy ->
                     guy data id model
@@ -167,7 +161,9 @@ update data model f =
                 Nothing ->
                     (model, Cmd.none)
     in
-        update_ data model runMux
+        case Decode.decodeString socketMsgDecoder data of
+            Ok socketMsg -> runMux socketMsg model
+            Err _ -> (model, Cmd.none)
 
 init : String -> String -> String -> String -> Cmd msg
 init url id name token =
