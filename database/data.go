@@ -29,7 +29,8 @@ func (d *Database) setup() error {
     );
 
     CREATE TABLE IF NOT EXISTS retros (
-      Id        TEXT PRIMARY KEY
+      Id        TEXT PRIMARY KEY,
+      Stage     TEXT
     );
 
     CREATE TABLE IF NOT EXISTS columns (

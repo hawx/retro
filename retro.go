@@ -81,7 +81,6 @@ type voteData struct {
 
 type Room struct {
 	retroId string
-	stage   string
 	server  *sock.Server
 	db      *database.Database
 
@@ -141,8 +140,10 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		if r.stage != "" {
-			conn.Send("", "stage", stageData{r.stage})
+		retro, _ := r.db.GetRetro(r.retroId)
+
+		if retro.Stage != "" {
+			conn.Send("", "stage", stageData{retro.Stage})
 		}
 
 		columns, _ := r.db.GetColumns(r.retroId)
@@ -211,7 +212,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.stage = args.Stage
+		r.db.SetStage(r.retroId, args.Stage)
 
 		conn.Broadcast(conn.Name, "stage", args)
 	})
@@ -274,7 +275,8 @@ func main() {
 	retroId := "hey"
 
 	db.EnsureRetro(database.Retro{
-		Id: retroId,
+		Id:    retroId,
+		Stage: "",
 	})
 
 	db.EnsureColumn(database.Column{
