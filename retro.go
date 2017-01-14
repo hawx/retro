@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"hawx.me/code/retro/models"
+	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
 
@@ -80,19 +80,19 @@ type voteData struct {
 }
 
 type Room struct {
-	stage  string
-	server *sock.Server
-	retro  *models.Retro
+	retroId string
+	server  *sock.Server
+	db      *database.Database
 
 	mu    sync.RWMutex
 	users map[string]string
 }
 
-func NewRoom() *Room {
+func NewRoom(retroId string, db *database.Database) *Room {
 	room := &Room{
-		server: sock.NewServer(),
-		retro:  models.NewRetro(),
-		users:  map[string]string{},
+		retroId: retroId,
+		db:      db,
+		server:  sock.NewServer(),
 	}
 
 	registerHandlers(room, room.server)
@@ -108,16 +108,16 @@ func boolToString(b bool) string {
 }
 
 func (r *Room) AddUser(user, token string) {
-	r.mu.Lock()
-	r.users[user] = token
-	r.mu.Unlock()
+	r.db.EnsureUser(database.User{
+		Username: user,
+		Token:    token,
+	})
 }
 
 func (r *Room) IsUser(user, token string) bool {
-	r.mu.RLock()
-	expectedToken, ok := r.users[user]
-	r.mu.RUnlock()
-	return ok && token == expectedToken
+	found, err := r.db.GetUser(user)
+
+	return err == nil && found.Token == token
 }
 
 func registerHandlers(r *Room, mux *sock.Server) {
@@ -140,18 +140,23 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		if r.stage != "" {
-			conn.Send("", "stage", stageData{r.stage})
+		retro, _ := r.db.GetRetro(r.retroId)
+
+		if retro.Stage != "" {
+			conn.Send("", "stage", stageData{retro.Stage})
 		}
 
-		for _, column := range r.retro.Columns() {
+		columns, _ := r.db.GetColumns(r.retroId)
+		for _, column := range columns {
 			conn.Send("", "column", columnData{column.Id, column.Name})
 
-			for cardId, card := range column.Cards() {
-				conn.Send("", "card", cardData{column.Id, cardId, card.Revealed, card.Votes})
+			cards, _ := r.db.GetCards(column.Id)
+			for _, card := range cards {
+				conn.Send("", "card", cardData{column.Id, card.Id, card.Revealed, card.Votes})
 
-				for _, content := range card.Contents() {
-					conn.Send(content.Author, "content", contentData{column.Id, cardId, content.Text})
+				contents, _ := r.db.GetContents(card.Id)
+				for _, content := range contents {
+					conn.Send(content.Author, "content", contentData{column.Id, card.Id, content.Text})
 				}
 			}
 		}
@@ -167,24 +172,27 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		content := models.Content{
-			Text:   args.CardText,
-			Author: conn.Name,
-		}
-
-		card := &models.Card{
+		card := database.Card{
 			Id:       strId(),
+			Column:   args.ColumnId,
 			Votes:    0,
 			Revealed: false,
 		}
 
-		card.Add(content)
+		r.db.AddCard(card)
 
-		r.retro.Get(args.ColumnId).Add(card)
+		content := database.Content{
+			Id:     strId(),
+			Card:   card.Id,
+			Text:   args.CardText,
+			Author: conn.Name,
+		}
+
+		r.db.AddContent(content)
 
 		conn.Broadcast("", "card", cardData{args.ColumnId, card.Id, card.Revealed, card.Votes})
 
-		conn.Broadcast(content.Author, "content", contentData{args.ColumnId, card.Id, content.Text})
+		conn.Broadcast(content.Author, "content", contentData{args.ColumnId, content.Card, content.Text})
 	})
 
 	mux.Handle("move", func(conn *sock.Conn, data []byte) {
@@ -193,10 +201,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		target := r.retro.GetCard(args.ColumnFrom, args.CardId)
-
-		r.retro.Get(args.ColumnTo).Add(target)
-		r.retro.Get(args.ColumnFrom).Remove(args.CardId)
+		r.db.MoveCard(args.CardId, args.ColumnTo)
 
 		conn.Broadcast(conn.Name, "move", args)
 	})
@@ -207,7 +212,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.stage = args.Stage
+		r.db.SetStage(r.retroId, args.Stage)
 
 		conn.Broadcast(conn.Name, "stage", args)
 	})
@@ -218,7 +223,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.retro.GetCard(args.ColumnId, args.CardId).Revealed = true
+		r.db.RevealCard(args.CardId)
 
 		conn.Broadcast(conn.Name, "reveal", args)
 	})
@@ -229,14 +234,9 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		from := r.retro.GetCard(args.ColumnFrom, args.CardFrom)
-		to := r.retro.GetCard(args.ColumnTo, args.CardTo)
-
-		to.Votes += from.Votes
-		r.retro.Get(args.ColumnFrom).Remove(args.CardFrom)
-
-		for _, content := range from.Contents() {
-			to.Add(content)
+		err := r.db.GroupCards(args.CardFrom, args.CardTo)
+		if err != nil {
+			log.Println(err)
 		}
 
 		conn.Broadcast(conn.Name, "group", args)
@@ -248,7 +248,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.retro.GetCard(args.ColumnId, args.CardId).Votes += 1
+		r.db.VoteCard(args.CardId)
 
 		conn.Broadcast(conn.Name, "vote", args)
 	})
@@ -266,12 +266,50 @@ func main() {
 	)
 	flag.Parse()
 
-	room := NewRoom()
-	room.retro.Add(models.NewColumn("0", "Start"))
-	room.retro.Add(models.NewColumn("1", "More"))
-	room.retro.Add(models.NewColumn("2", "Keep"))
-	room.retro.Add(models.NewColumn("3", "Less"))
-	room.retro.Add(models.NewColumn("4", "Stop"))
+	db, err := database.Open("./db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	retroId := "hey"
+
+	db.EnsureRetro(database.Retro{
+		Id:    retroId,
+		Stage: "",
+	})
+
+	db.EnsureColumn(database.Column{
+		Id:    "0",
+		Retro: retroId,
+		Name:  "Start",
+	})
+
+	db.EnsureColumn(database.Column{
+		Id:    "1",
+		Retro: retroId,
+		Name:  "More",
+	})
+
+	db.EnsureColumn(database.Column{
+		Id:    "2",
+		Retro: retroId,
+		Name:  "Keep",
+	})
+
+	db.EnsureColumn(database.Column{
+		Id:    "3",
+		Retro: retroId,
+		Name:  "Less",
+	})
+
+	db.EnsureColumn(database.Column{
+		Id:    "4",
+		Retro: retroId,
+		Name:  "Stop",
+	})
+
+	room := NewRoom("hey", db)
 
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 
