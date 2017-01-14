@@ -1,4 +1,4 @@
-package data
+package database
 
 type User struct {
 	Username string
@@ -6,7 +6,7 @@ type User struct {
 }
 
 func (d *Database) EnsureUser(user User) error {
-	_, err := d.db.Exec("INSERT OR REPLACE INTO users (Username, Token) VALUES(?, ?)",
+	_, err := d.db.Exec("INSERT OR REPLACE INTO users(Username, Token) VALUES(?, ?)",
 		user.Username,
 		user.Token)
 
