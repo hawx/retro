@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hawx.me/code/retro/data"
 	"hawx.me/code/retro/models"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
@@ -83,16 +84,17 @@ type Room struct {
 	stage  string
 	server *sock.Server
 	retro  *models.Retro
+	db     *data.Database
 
 	mu    sync.RWMutex
 	users map[string]string
 }
 
-func NewRoom() *Room {
+func NewRoom(db *data.Database) *Room {
 	room := &Room{
+		db:     db,
 		server: sock.NewServer(),
 		retro:  models.NewRetro(),
-		users:  map[string]string{},
 	}
 
 	registerHandlers(room, room.server)
@@ -108,16 +110,16 @@ func boolToString(b bool) string {
 }
 
 func (r *Room) AddUser(user, token string) {
-	r.mu.Lock()
-	r.users[user] = token
-	r.mu.Unlock()
+	r.db.EnsureUser(data.User{
+		Username: user,
+		Token:    token,
+	})
 }
 
 func (r *Room) IsUser(user, token string) bool {
-	r.mu.RLock()
-	expectedToken, ok := r.users[user]
-	r.mu.RUnlock()
-	return ok && token == expectedToken
+	found, err := r.db.GetUser(user)
+
+	return err == nil && found.Token == token
 }
 
 func registerHandlers(r *Room, mux *sock.Server) {
@@ -266,7 +268,13 @@ func main() {
 	)
 	flag.Parse()
 
-	room := NewRoom()
+	db, err := data.Open("./db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	room := NewRoom(db)
 	room.retro.Add(models.NewColumn("0", "Start"))
 	room.retro.Add(models.NewColumn("1", "More"))
 	room.retro.Add(models.NewColumn("2", "Keep"))
