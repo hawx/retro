@@ -237,9 +237,9 @@ socketUpdate (id, msgData) model =
             in
                 { model | retro = Retro.addContent columnId cardId content model.retro } ! []
 
-        Sock.Column { columnId, columnName } ->
+        Sock.Column { columnId, columnName, columnOrder } ->
             let
-                column = { id = columnId, name = columnName, cards = Dict.empty }
+                column = { id = columnId, name = columnName, order = columnOrder, cards = Dict.empty }
             in
                 { model | retro = Retro.addColumn column model.retro } ! []
 
@@ -407,7 +407,7 @@ columnsView connId stage dnd columns =
 
     else
         Dict.toList columns
-            |> List.sortBy (fst)
+            |> List.sortBy (snd >> .order)
             |> List.map (columnView connId stage dnd)
             |> Bulma.columns [ ]
 

@@ -37,6 +37,7 @@ func (d *Database) setup() error {
       Id        TEXT PRIMARY KEY,
       Retro     TEXT,
       Name      TEXT,
+      "Order"   INTEGER,
       FOREIGN KEY(Retro) REFERENCES retros(Id)
     );
 

@@ -10,6 +10,7 @@ import Card exposing (Card)
 type alias Column =
     { id : String
     , name : String
+    , order : Int
     , cards : Dict String Card
     }
 

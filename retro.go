@@ -40,8 +40,9 @@ type stageData struct {
 }
 
 type columnData struct {
-	ColumnId   string `json:"columnId"`
-	ColumnName string `json:"columnName"`
+	ColumnId    string `json:"columnId"`
+	ColumnName  string `json:"columnName"`
+	ColumnOrder int    `json:"columnOrder"`
 }
 
 type cardData struct {
@@ -151,9 +152,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			conn.Send("", "stage", stageData{retro.Stage})
 		}
 
-		columns, _ := r.db.GetColumns(args.RetroId)
+		columns, err := r.db.GetColumns(args.RetroId)
+		if err != nil {
+			log.Println("columns", err)
+			return
+		}
 		for _, column := range columns {
-			conn.Send("", "column", columnData{column.Id, column.Name})
+			conn.Send("", "column", columnData{column.Id, column.Name, column.Order})
 
 			cards, _ := r.db.GetCards(column.Id)
 			for _, card := range cards {
@@ -408,30 +413,35 @@ func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
 		Id:    strId(),
 		Retro: retroId,
 		Name:  "Start",
+		Order: 0,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
 		Retro: retroId,
 		Name:  "More",
+		Order: 1,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
 		Retro: retroId,
 		Name:  "Keep",
+		Order: 2,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
 		Retro: retroId,
 		Name:  "Less",
+		Order: 3,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
 		Retro: retroId,
 		Name:  "Stop",
+		Order: 4,
 	})
 
 	var list []string

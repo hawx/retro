@@ -43,13 +43,14 @@ stageDecoder =
     Pipeline.decode StageData
         |> Pipeline.required "stage" Decode.string
 
-type alias ColumnData = { columnId : String, columnName : String }
+type alias ColumnData = { columnId : String, columnName : String, columnOrder : Int }
 
 columnDecoder : Decode.Decoder ColumnData
 columnDecoder =
     Pipeline.decode ColumnData
         |> Pipeline.required "columnId" Decode.string
         |> Pipeline.required "columnName" Decode.string
+        |> Pipeline.required "columnOrder" Decode.int
 
 type alias CardData = { columnId : String, cardId : String, revealed : Bool, votes : Int }
 
