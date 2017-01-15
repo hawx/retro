@@ -140,7 +140,11 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		retro, _ := r.db.GetRetro(args.RetroId)
+		retro, err := r.db.GetRetro(args.RetroId)
+		if err != nil {
+			log.Println("init", args.RetroId, err)
+			return
+		}
 		conn.RetroId = args.RetroId
 
 		if retro.Stage != "" {
@@ -377,14 +381,10 @@ func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
 	return false, nil
 }
 
-type CreatedRetro struct {
-	RetroId string `json:"retroId"`
-}
-
 func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
-	list := []CreatedRetro{{
-		RetroId: "hey",
-	}}
+	list := []string{
+		"hey",
+	}
 
 	json.NewEncoder(w).Encode(list)
 }

@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Http
 import Bulma
 import Debug
 import Html exposing (Html)
@@ -49,6 +50,7 @@ type alias Model =
     { user : Maybe String
     , token : Maybe String
     , retroId : Maybe String
+    , retroList : Maybe (List String)
     , stage : Stage
     , retro : Retro
     , input : String
@@ -56,17 +58,18 @@ type alias Model =
     , flags : Flags
     }
 
-init : Flags -> (Model, Cmd msg)
+init : Flags -> (Model, Cmd Msg)
 init flags =
     { user = Nothing
     , token = Nothing
     , retroId = Nothing
+    , retroList = Nothing
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
     , dnd = DragAndDrop.empty
     , flags = flags
-    } ! [ storageGet "id" ]
+    } ! [ storageGet "id", getRetros ]
 
 -- Update
 
@@ -75,6 +78,7 @@ port storageGet : String -> Cmd msg
 port storageGot : (Maybe String -> msg) -> Sub msg
 
 type Msg = SetId (Maybe String)
+         | GotRetros (Result Http.Error (List String))
          | SetRetro String
          | Socket String
          | ChangeInput String String
@@ -82,6 +86,11 @@ type Msg = SetId (Maybe String)
          | Reveal String String
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
+
+getRetros : Cmd Msg
+getRetros =
+     Http.get "/retros" (Decode.list Decode.string)
+         |> Http.send GotRetros
 
 joinRetro : Model -> (Model, Cmd Msg)
 joinRetro model =
@@ -97,6 +106,13 @@ joinRetro model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        GotRetros resp ->
+            case Debug.log "" resp of
+                Ok retros ->
+                    { model | retroList = Just retros } ! []
+                _ ->
+                    model ! []
+
         SetRetro retroId ->
             joinRetro { model | retroId = Just retroId }
 
@@ -271,12 +287,14 @@ view model =
 
         retroList =
             Bulma.modal
-                [ Bulma.box []
-                      [ Html.button [ Attr.class "button"
-                                    , Event.onClick (SetRetro "hey")
-                                    ]
-                            [ Html.text "Hey" ]
-                      ]
+                [ Bulma.box [] <|
+                      List.map (\name ->
+                                    Html.button [ Attr.class "button"
+                                                , Event.onClick (SetRetro name)
+                                                ]
+                                    [ Html.text name ]
+                               ) (Maybe.withDefault [] model.retroList)
+
                 ]
 
     in
