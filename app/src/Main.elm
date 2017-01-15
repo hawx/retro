@@ -46,8 +46,9 @@ type alias CardDragging = (String, String)
 type alias CardOver = (String, Maybe String)
 
 type alias Model =
-    { user : String
-    , joined : Bool
+    { user : Maybe String
+    , token : Maybe String
+    , retroId : Maybe String
     , stage : Stage
     , retro : Retro
     , input : String
@@ -57,8 +58,9 @@ type alias Model =
 
 init : Flags -> (Model, Cmd msg)
 init flags =
-    { user = ""
-    , joined = False
+    { user = Nothing
+    , token = Nothing
+    , retroId = Nothing
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
@@ -73,6 +75,7 @@ port storageGet : String -> Cmd msg
 port storageGot : (Maybe String -> msg) -> Sub msg
 
 type Msg = SetId (Maybe String)
+         | SetRetro String
          | Socket String
          | ChangeInput String String
          | SetStage Stage
@@ -80,61 +83,91 @@ type Msg = SetId (Maybe String)
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
 
+joinRetro : Model -> (Model, Cmd Msg)
+joinRetro model =
+    let
+        f id retroId token =
+            Sock.init (webSocketUrl model.flags) id retroId id token
+    in
+        case Maybe.map3 f model.user model.retroId model.token of
+            Just cmd -> (model, cmd)
+            Nothing -> (model, Cmd.none)
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        SetRetro retroId ->
+            joinRetro { model | retroId = Just retroId }
+
         Vote columnId cardId ->
-            model ! [ Sock.vote (webSocketUrl model.flags) model.user columnId cardId ]
+            case model.user of
+                Just userId ->
+                    model ! [ Sock.vote (webSocketUrl model.flags) userId columnId cardId ]
+                _ ->
+                    model ! []
 
         SetId (Just parts) ->
             case String.split ";" parts of
                 [id, token] ->
-                    { model | user = id, joined = True } !
-                        [ Sock.init (webSocketUrl model.flags) id "hey" id token ]
+                    joinRetro { model | user = Just id, token = Just token }
                 _ ->
-                    { model | user = "", joined = False } ! []
+                    { model | user = Nothing } ! []
 
         SetStage stage ->
-            { model | stage = stage } !
-                [ Sock.stage (webSocketUrl model.flags) model.user (toString stage) ]
+            case model.user of
+                Just userId ->
+                    { model | stage = stage } ! [ Sock.stage (webSocketUrl model.flags) userId (toString stage) ]
+                _ ->
+                    model ! []
 
         Reveal columnId cardId ->
-            model ! [ Sock.reveal (webSocketUrl model.flags) model.user columnId cardId ]
+            case model.user of
+                Just userId ->
+                    model ! [ Sock.reveal (webSocketUrl model.flags) userId columnId cardId ]
+                _ ->
+                    model ! []
 
         DnD subMsg ->
-            case DragAndDrop.isDrop subMsg model.dnd of
-                Just ((columnFrom, cardFrom), (columnTo, maybeCardTo)) ->
-                    case model.stage of
-                        Thinking ->
-                            if columnFrom /= columnTo then
-                                { model | dnd = DragAndDrop.empty } !
-                                    [ Sock.move (webSocketUrl model.flags) model.user columnFrom columnTo cardFrom ]
-                            else
-                                model ! []
-
-                        Voting ->
-                            case maybeCardTo of
-                                Just cardTo ->
-                                    if cardFrom /= cardTo then
-                                        { model | dnd = DragAndDrop.empty } ! [ Sock.group (webSocketUrl model.flags) model.user columnFrom cardFrom columnTo cardTo ]
+            case model.user of
+                Just userId ->
+                    case DragAndDrop.isDrop subMsg model.dnd of
+                        Just ((columnFrom, cardFrom), (columnTo, maybeCardTo)) ->
+                            case model.stage of
+                                Thinking ->
+                                    if columnFrom /= columnTo then
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.move (webSocketUrl model.flags) userId columnFrom columnTo cardFrom ]
                                     else
                                         model ! []
-                                Nothing ->
+
+                                Voting ->
+                                    case maybeCardTo of
+                                        Just cardTo ->
+                                            if cardFrom /= cardTo then
+                                                { model | dnd = DragAndDrop.empty } ! [ Sock.group (webSocketUrl model.flags) userId columnFrom cardFrom columnTo cardTo ]
+                                            else
+                                                model ! []
+                                        Nothing ->
+                                            model ! []
+
+                                _ ->
                                     model ! []
 
-                        _ ->
-                            model ! []
+                        Nothing ->
+                            { model | dnd = DragAndDrop.update subMsg model.dnd } ! []
 
-                Nothing ->
-                    { model | dnd = DragAndDrop.update subMsg model.dnd } ! []
+                _ ->
+                    model ! []
 
         ChangeInput columnId input ->
-            if String.endsWith "\n" input && String.trim model.input /= "" then
-                { model | input = "" } !
-                    [ Sock.add (webSocketUrl model.flags) model.user columnId model.input ]
-            else
-                { model | input = String.trim input } ! []
+            case model.user of
+                Just userId ->
+                    if String.endsWith "\n" input && String.trim model.input /= "" then
+                        { model | input = "" } ! [ Sock.add (webSocketUrl model.flags) userId columnId model.input ]
+                    else
+                        { model | input = String.trim input } ! []
+                _ ->
+                    model ! []
 
         Socket data ->
             Sock.update data model socketUpdate
@@ -199,7 +232,7 @@ handleError : String -> Model -> (Model, Cmd Msg)
 handleError error model =
     case error of
         "unknown_user" ->
-            { model | user = "", joined = False } ! []
+            { model | user = Nothing } ! []
 
         _ ->
             model ! []
@@ -213,33 +246,46 @@ view model =
             Html.section [ Attr.class "section" ]
                 [ Html.div [ Attr.class "container is-fluid" ]
                       [ tabsView model.stage
-                      , columnsView model.user model.stage model.dnd model.retro.columns
+                      , columnsView (Maybe.withDefault "what, please fix this" model.user) model.stage model.dnd model.retro.columns
                       ]
                 ]
 
         footer =
-          Html.footer [ Attr.class "footer" ]
-            [ Html.div [ Attr.class "container" ]
-                  [ Html.div [ Attr.class "content has-text-centered" ]
-                        [ Html.text "A link to github?"
-                        ]
-                  ]
-            ]
+            Html.footer [ Attr.class "footer" ]
+                [ Html.div [ Attr.class "container" ]
+                      [ Html.div [ Attr.class "content has-text-centered" ]
+                            [ Html.text "A link to github?"
+                            ]
+                      ]
+                ]
 
         modal =
-          Bulma.modal
-            [ Bulma.box []
-                  [ Html.a [ Attr.class "button is-primary"
-                           , Attr.href "/oauth/login"
-                           ]
-                        [ Html.text "Sign-in with GitHub" ]
-                  ]
-            ]
+            Bulma.modal
+                [ Bulma.box []
+                      [ Html.a [ Attr.class "button is-primary"
+                               , Attr.href "/oauth/login"
+                               ]
+                            [ Html.text "Sign-in with GitHub" ]
+                      ]
+                ]
+
+        retroList =
+            Bulma.modal
+                [ Bulma.box []
+                      [ Html.button [ Attr.class "button"
+                                    , Event.onClick (SetRetro "hey")
+                                    ]
+                            [ Html.text "Hey" ]
+                      ]
+                ]
+
     in
-        if model.joined then
-            Html.div [] [ tabs, footer ]
-        else
+        if model.user == Nothing then
             Html.div [] [ tabs, footer, modal ]
+        else if model.retroId == Nothing then
+            Html.div [] [ tabs, footer, retroList ]
+        else
+            Html.div [] [ tabs, footer ]
 
 
 tabsView : Stage -> Html Msg
