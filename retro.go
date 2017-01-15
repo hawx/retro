@@ -383,7 +383,6 @@ func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
 
 func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
 	var list []string
-
 	retros, _ := room.db.GetRetros()
 
 	for _, retro := range retros {
@@ -394,7 +393,11 @@ func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
 }
 
 func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
-	const retroId = "hey"
+	var retroId string
+	if err := json.NewDecoder(r.Body).Decode(&retroId); err != nil {
+		log.Println(err)
+		return
+	}
 
 	room.db.EnsureRetro(database.Retro{
 		Id:    retroId,
@@ -430,4 +433,13 @@ func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
 		Retro: retroId,
 		Name:  "Stop",
 	})
+
+	var list []string
+	retros, _ := room.db.GetRetros()
+
+	for _, retro := range retros {
+		list = append(list, retro.Id)
+	}
+
+	json.NewEncoder(w).Encode(list)
 }

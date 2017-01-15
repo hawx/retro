@@ -51,6 +51,7 @@ type alias Model =
     , token : Maybe String
     , retroId : Maybe String
     , retroList : Maybe (List String)
+    , retroName : String
     , stage : Stage
     , retro : Retro
     , input : String
@@ -64,6 +65,7 @@ init flags =
     , token = Nothing
     , retroId = Nothing
     , retroList = Nothing
+    , retroName = ""
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
@@ -78,6 +80,8 @@ port storageGet : String -> Cmd msg
 port storageGot : (Maybe String -> msg) -> Sub msg
 
 type Msg = SetId (Maybe String)
+         | SetRetroName String
+         | CreateRetro
          | GotRetros (Result Http.Error (List String))
          | SetRetro String
          | Socket String
@@ -91,6 +95,11 @@ getRetros : Cmd Msg
 getRetros =
      Http.get "/retros" (Decode.list Decode.string)
          |> Http.send GotRetros
+
+createRetro : String -> Cmd Msg
+createRetro name =
+    Http.post "/retros" (Http.jsonBody (Encode.string name)) (Decode.list Decode.string)
+        |> Http.send GotRetros
 
 joinRetro : Model -> (Model, Cmd Msg)
 joinRetro model =
@@ -106,8 +115,14 @@ joinRetro model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        SetRetroName input ->
+            { model | retroName = input } ! []
+
+        CreateRetro ->
+            model ! [ createRetro model.retroName ]
+
         GotRetros resp ->
-            case Debug.log "" resp of
+            case resp of
                 Ok retros ->
                     { model | retroList = Just retros } ! []
                 _ ->
@@ -288,13 +303,23 @@ view model =
         retroList =
             Bulma.modal
                 [ Bulma.box [] <|
-                      List.map (\name ->
+                      List.concat
+                      [ [ Html.h1 [] [ Html.text "Retros" ]
+                        ]
+                      , List.map (\name ->
                                     Html.button [ Attr.class "button"
                                                 , Event.onClick (SetRetro name)
                                                 ]
                                     [ Html.text name ]
                                ) (Maybe.withDefault [] model.retroList)
-
+                      ]
+                , Bulma.box []
+                    [ Html.input [ Event.onInput SetRetroName ]
+                          [ ]
+                    , Html.button [ Attr.class "button"
+                                  , Event.onClick CreateRetro ]
+                          [ Html.text "Create" ]
+                    ]
                 ]
 
     in
