@@ -5,8 +5,8 @@ type Retro struct {
 	Stage string
 }
 
-func (d *Database) EnsureRetro(retro Retro) error {
-	_, err := d.db.Exec("INSERT OR IGNORE INTO retros(Id, Stage) VALUES (?, ?)",
+func (d *Database) AddRetro(retro Retro) error {
+	_, err := d.db.Exec("INSERT INTO retros(Id, Stage) VALUES (?, ?)",
 		retro.Id,
 		retro.Stage)
 

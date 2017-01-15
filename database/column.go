@@ -6,8 +6,8 @@ type Column struct {
 	Name  string
 }
 
-func (d *Database) EnsureColumn(column Column) error {
-	_, err := d.db.Exec("INSERT OR REPLACE INTO columns(Id, Retro, Name) VALUES (?, ?, ?)",
+func (d *Database) AddColumn(column Column) error {
+	_, err := d.db.Exec("INSERT INTO columns(Id, Retro, Name) VALUES (?, ?, ?)",
 		column.Id,
 		column.Retro,
 		column.Name)

@@ -399,37 +399,37 @@ func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room.db.EnsureRetro(database.Retro{
+	room.db.AddRetro(database.Retro{
 		Id:    retroId,
 		Stage: "",
 	})
 
-	room.db.EnsureColumn(database.Column{
-		Id:    "0",
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
 		Retro: retroId,
 		Name:  "Start",
 	})
 
-	room.db.EnsureColumn(database.Column{
-		Id:    "1",
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
 		Retro: retroId,
 		Name:  "More",
 	})
 
-	room.db.EnsureColumn(database.Column{
-		Id:    "2",
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
 		Retro: retroId,
 		Name:  "Keep",
 	})
 
-	room.db.EnsureColumn(database.Column{
-		Id:    "3",
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
 		Retro: retroId,
 		Name:  "Less",
 	})
 
-	room.db.EnsureColumn(database.Column{
-		Id:    "4",
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
 		Retro: retroId,
 		Name:  "Stop",
 	})
