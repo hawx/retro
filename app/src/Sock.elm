@@ -138,11 +138,12 @@ update data model f =
     in
         Sock.LowLevel.update data model runMux
 
-init : String -> String -> String -> String -> Cmd msg
-init url id name token =
+init : String -> String -> String -> String -> String -> Cmd msg
+init url id retroId name token =
     Sock.LowLevel.send url id "init" <|
         Encode.object
-            [ ("name", Encode.string name)
+            [ ("retroId", Encode.string retroId)
+            , ("name", Encode.string name)
             , ("token", Encode.string token)
             ]
 

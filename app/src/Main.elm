@@ -91,7 +91,7 @@ update msg model =
             case String.split ";" parts of
                 [id, token] ->
                     { model | user = id, joined = True } !
-                        [ Sock.init (webSocketUrl model.flags) id id token ]
+                        [ Sock.init (webSocketUrl model.flags) id "hey" id token ]
                 _ ->
                     { model | user = "", joined = False } ! []
 

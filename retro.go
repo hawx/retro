@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hawx.me/code/mux"
 	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
@@ -80,19 +81,17 @@ type voteData struct {
 }
 
 type Room struct {
-	retroId string
-	server  *sock.Server
-	db      *database.Database
+	server *sock.Server
+	db     *database.Database
 
 	mu    sync.RWMutex
 	users map[string]string
 }
 
-func NewRoom(retroId string, db *database.Database) *Room {
+func NewRoom(db *database.Database) *Room {
 	room := &Room{
-		retroId: retroId,
-		db:      db,
-		server:  sock.NewServer(),
+		db:     db,
+		server: sock.NewServer(),
 	}
 
 	registerHandlers(room, room.server)
@@ -123,8 +122,9 @@ func (r *Room) IsUser(user, token string) bool {
 func registerHandlers(r *Room, mux *sock.Server) {
 	mux.Handle("init", func(conn *sock.Conn, data []byte) {
 		var args struct {
-			Name  string
-			Token string
+			RetroId string
+			Name    string
+			Token   string
 		}
 		if err := json.Unmarshal(data, &args); err != nil {
 			log.Println("init:", err)
@@ -140,13 +140,14 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		retro, _ := r.db.GetRetro(r.retroId)
+		retro, _ := r.db.GetRetro(args.RetroId)
+		conn.RetroId = args.RetroId
 
 		if retro.Stage != "" {
 			conn.Send("", "stage", stageData{retro.Stage})
 		}
 
-		columns, _ := r.db.GetColumns(r.retroId)
+		columns, _ := r.db.GetColumns(args.RetroId)
 		for _, column := range columns {
 			conn.Send("", "column", columnData{column.Id, column.Name})
 
@@ -212,7 +213,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.db.SetStage(r.retroId, args.Stage)
+		r.db.SetStage(conn.RetroId, args.Stage)
 
 		conn.Broadcast(conn.Name, "stage", args)
 	})
@@ -272,46 +273,14 @@ func main() {
 	}
 	defer db.Close()
 
-	retroId := "hey"
-
-	db.EnsureRetro(database.Retro{
-		Id:    retroId,
-		Stage: "",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "0",
-		Retro: retroId,
-		Name:  "Start",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "1",
-		Retro: retroId,
-		Name:  "More",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "2",
-		Retro: retroId,
-		Name:  "Keep",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "3",
-		Retro: retroId,
-		Name:  "Less",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "4",
-		Retro: retroId,
-		Name:  "Stop",
-	})
-
-	room := NewRoom("hey", db)
+	room := NewRoom(db)
 
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
+
+	http.Handle("/retros", mux.Method{
+		"GET":  http.HandlerFunc(room.listRetros),
+		"POST": http.HandlerFunc(room.createRetro),
+	})
 
 	http.Handle("/ws", room.server)
 
@@ -406,4 +375,55 @@ func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+type CreatedRetro struct {
+	RetroId string `json:"retroId"`
+}
+
+func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
+	list := []CreatedRetro{{
+		RetroId: "hey",
+	}}
+
+	json.NewEncoder(w).Encode(list)
+}
+
+func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
+	const retroId = "hey"
+
+	room.db.EnsureRetro(database.Retro{
+		Id:    retroId,
+		Stage: "",
+	})
+
+	room.db.EnsureColumn(database.Column{
+		Id:    "0",
+		Retro: retroId,
+		Name:  "Start",
+	})
+
+	room.db.EnsureColumn(database.Column{
+		Id:    "1",
+		Retro: retroId,
+		Name:  "More",
+	})
+
+	room.db.EnsureColumn(database.Column{
+		Id:    "2",
+		Retro: retroId,
+		Name:  "Keep",
+	})
+
+	room.db.EnsureColumn(database.Column{
+		Id:    "3",
+		Retro: retroId,
+		Name:  "Less",
+	})
+
+	room.db.EnsureColumn(database.Column{
+		Id:    "4",
+		Retro: retroId,
+		Name:  "Stop",
+	})
 }
