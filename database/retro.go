@@ -23,6 +23,24 @@ func (d *Database) GetRetro(id string) (Retro, error) {
 	return retro, err
 }
 
+func (d *Database) GetRetros() (retros []Retro, err error) {
+	rows, err := d.db.Query("SELECT Id, Stage FROM retros")
+	if err != nil {
+		return retros, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var retro Retro
+		if err = rows.Scan(&retro.Id, &retro.Stage); err != nil {
+			return retros, err
+		}
+		retros = append(retros, retro)
+	}
+
+	return retros, rows.Err()
+}
+
 func (d *Database) SetStage(id, stage string) error {
 	_, err := d.db.Exec("UPDATE retros SET Stage=? WHERE Id=?",
 		stage,

@@ -382,8 +382,12 @@ func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
 }
 
 func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
-	list := []string{
-		"hey",
+	var list []string
+
+	retros, _ := room.db.GetRetros()
+
+	for _, retro := range retros {
+		list = append(list, retro.Id)
 	}
 
 	json.NewEncoder(w).Encode(list)
