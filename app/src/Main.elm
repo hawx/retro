@@ -44,8 +44,6 @@ webSocketUrl flags =
 
 -- Model
 
-type Stage = Thinking | Presenting | Voting | Discussing
-
 type alias CardDragging = (String, String)
 type alias CardOver = (String, Maybe String)
 
@@ -55,7 +53,6 @@ type alias Model =
     , retroId : Maybe String
     , retroList : Maybe (List String)
     , retroName : String
-    , stage : Stage
     , retro : Retro
     , input : String
     , dnd : DragAndDrop.Model CardDragging CardOver
@@ -73,7 +70,6 @@ init flags location =
                 , retroId = Nothing
                 , retroList = Nothing
                 , retroName = ""
-                , stage = Thinking
                 , retro = Retro.empty
                 , input = ""
                 , dnd = DragAndDrop.empty
@@ -95,7 +91,7 @@ type Msg = SetId (Maybe String)
          | Socket String
          | ChangeInput String String
          | CreateCard String
-         | SetStage Stage
+         | SetStage Retro.Stage
          | Reveal String String
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
@@ -155,7 +151,8 @@ update msg model =
         SetStage stage ->
             case model.user of
                 Just userId ->
-                    { model | stage = stage } ! [ Sock.stage (webSocketUrl model.flags) userId (toString stage) ]
+                    { model | retro = Retro.setStage stage model.retro } !
+                        [ Sock.stage (webSocketUrl model.flags) userId (toString stage) ]
                 _ ->
                     model ! []
 
@@ -171,14 +168,14 @@ update msg model =
                 Just userId ->
                     case DragAndDrop.isDrop subMsg model.dnd of
                         Just ((columnFrom, cardFrom), (columnTo, maybeCardTo)) ->
-                            case model.stage of
-                                Thinking ->
+                            case model.retro.stage of
+                                Retro.Thinking ->
                                     if columnFrom /= columnTo then
                                         { model | dnd = DragAndDrop.empty } ! [ Sock.move (webSocketUrl model.flags) userId columnFrom columnTo cardFrom ]
                                     else
                                         model ! []
 
-                                Voting ->
+                                Retro.Voting ->
                                     case maybeCardTo of
                                         Just cardTo ->
                                             if cardFrom /= cardTo then
@@ -228,17 +225,25 @@ urlChange location model =
         _ ->
             model ! []
 
+parseStage : String -> Maybe Retro.Stage
+parseStage s =
+    case s of
+        "Thinking" -> Just Retro.Thinking
+        "Presenting" -> Just Retro.Presenting
+        "Voting" -> Just Retro.Voting
+        "Discussing" -> Just Retro.Discussing
+        _ -> Nothing
 
 socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
 socketUpdate (id, msgData) model =
     case msgData of
         Sock.Stage { stage } ->
-            case stage of
-                "Thinking" -> { model | stage = Thinking } ! []
-                "Presenting" -> { model | stage = Presenting } ! []
-                "Voting" -> { model | stage = Voting } ! []
-                "Discussing" -> { model | stage = Discussing } ! []
-                _ -> model ! []
+            case parseStage stage of
+                Just s ->
+                    { model | retro = Retro.setStage s model.retro } ! []
+
+                Nothing ->
+                    model ! []
 
         Sock.Card { columnId, cardId, revealed, votes } ->
             let
@@ -318,8 +323,8 @@ retroView : String -> Model -> Html Msg
 retroView userId model =
     Html.section [ Attr.class "section" ]
         [ Html.div [ Attr.class "container is-fluid" ]
-              [ tabsView model.stage
-              , columnsView userId model.stage model.dnd model.retro.columns
+              [ tabsView model.retro.stage
+              , columnsView userId model.retro.stage model.dnd model.retro.columns
               ]
         ]
 
@@ -376,7 +381,7 @@ footer =
         ]
 
 
-tabsView : Stage -> Html Msg
+tabsView : Retro.Stage -> Html Msg
 tabsView stage =
     let
         tab s =
@@ -388,10 +393,10 @@ tabsView stage =
     in
         Bulma.tabs [ Attr.class "is-toggle" ]
             [ Html.ul [ Attr.class "is-left" ]
-                  [ tab Thinking
-                  , tab Presenting
-                  , tab Voting
-                  , tab Discussing
+                  [ tab Retro.Thinking
+                  , tab Retro.Presenting
+                  , tab Retro.Voting
+                  , tab Retro.Discussing
                   ]
             , Html.ul [ Attr.class "is-right" ]
                 [ Html.li []
@@ -404,9 +409,9 @@ tabsView stage =
 fst (a, b) = a
 snd (a, b) = b
 
-columnsView : String -> Stage -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
+columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
 columnsView connId stage dnd columns =
-    if stage == Discussing then
+    if stage == Retro.Discussing then
         let
             getList : Dict comparable a -> List a
             getList dict = Dict.toList dict |> List.map snd
@@ -457,7 +462,7 @@ columnsView connId stage dnd columns =
             |> List.map (columnView connId stage dnd)
             |> Bulma.columns [ ]
 
-columnView : String -> Stage -> DragAndDrop.Model CardDragging CardOver -> (String, Column) -> Html Msg
+columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> (String, Column) -> Html Msg
 columnView connId stage dnd (columnId, column) =
     let
         title = [titleCardView column.name]
@@ -468,7 +473,7 @@ columnView connId stage dnd (columnId, column) =
         add = [addCardView columnId]
     in
         case stage of
-            Thinking ->
+            Retro.Thinking ->
                 Bulma.column ([ Attr.classList [ ("over", dnd.over == Just (columnId, Nothing))
                                               ]
                              ] ++ DragAndDrop.dropzone DnD (columnId, Nothing))
@@ -492,13 +497,13 @@ contentsView contents =
         |> List.intersperse (Html.hr [] [])
         |> Bulma.content []
 
-cardView : String -> Stage -> DragAndDrop.Model CardDragging CardOver -> String -> (String, Card) -> List (Html Msg)
+cardView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> (String, Card) -> List (Html Msg)
 cardView connId stage dnd columnId (cardId, card) =
     let
         content = contentsView card.contents
     in
         case stage of
-            Thinking ->
+            Retro.Thinking ->
                 if Card.authored connId card then
                     [ Bulma.card (DragAndDrop.draggable DnD (columnId, cardId))
                           [ Bulma.cardContent [] [ content ] ]
@@ -506,7 +511,7 @@ cardView connId stage dnd columnId (cardId, card) =
                 else
                     []
 
-            Presenting ->
+            Retro.Presenting ->
                 if not card.revealed then
                     if Card.authored connId card then
                         [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed)
@@ -523,7 +528,7 @@ cardView connId stage dnd columnId (cardId, card) =
                           [ Bulma.cardContent [] [ content ] ]
                     ]
 
-            Voting ->
+            Retro.Voting ->
                 [ Bulma.card (List.concat
                                   [ DragAndDrop.draggable DnD (columnId, cardId)
                                   , DragAndDrop.dropzone DnD (columnId, Just cardId)
