@@ -254,21 +254,20 @@ cardView connId stage dnd columnId (cardId, card) =
                 []
 
         Retro.Presenting ->
-            if not card.revealed then
-                if Card.authored connId card then
-                    [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed)
-                                                  , ("can-reveal", True)
-                                                  ]
-                                 , Event.onClick (Reveal columnId cardId)
-                                 ]
-                          [ Bulma.cardContent [] [ contentsView card.contents ] ]
-                    ]
-                else
-                    []
-            else
+            if card.revealed then
                 [ Bulma.card []
                       [ Bulma.cardContent [] [ contentsView card.contents ] ]
                 ]
+            else if Card.authored connId card then
+                [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed)
+                                              , ("can-reveal", True)
+                                              ]
+                             , Event.onClick (Reveal columnId cardId)
+                             ]
+                      [ Bulma.cardContent [] [ contentsView card.contents ] ]
+                ]
+            else
+                []
 
         Retro.Voting ->
             if card.revealed then
@@ -292,14 +291,11 @@ cardView connId stage dnd columnId (cardId, card) =
             else
                 []
 
-        _ ->
-            if card.revealed || Card.authored connId card then
-                [ Bulma.card [ Attr.classList [ ("not-revealed", not card.revealed) ]
-                             ]
-                      [ Bulma.cardContent [] [ contentsView card.contents ] ]
+        Retro.Discussing ->
+            [ Bulma.card []
+                [ Bulma.cardContent [] [ contentsView card.contents ]
                 ]
-            else
-                []
+            ]
 
 
 titleCardView : String -> Html Msg
