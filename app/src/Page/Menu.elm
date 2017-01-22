@@ -1,4 +1,8 @@
-module Page.Menu exposing (..)
+module Page.Menu exposing ( Model
+                          , init
+                          , Msg
+                          , update
+                          , view)
 
 import Http
 import Html exposing (Html)
