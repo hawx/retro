@@ -1,5 +1,6 @@
 port module Main exposing (main)
 
+import Http
 import Bulma
 import Debug
 import Html exposing (Html)
@@ -46,8 +47,11 @@ type alias CardDragging = (String, String)
 type alias CardOver = (String, Maybe String)
 
 type alias Model =
-    { user : String
-    , joined : Bool
+    { user : Maybe String
+    , token : Maybe String
+    , retroId : Maybe String
+    , retroList : Maybe (List String)
+    , retroName : String
     , stage : Stage
     , retro : Retro
     , input : String
@@ -55,16 +59,19 @@ type alias Model =
     , flags : Flags
     }
 
-init : Flags -> (Model, Cmd msg)
+init : Flags -> (Model, Cmd Msg)
 init flags =
-    { user = ""
-    , joined = False
+    { user = Nothing
+    , token = Nothing
+    , retroId = Nothing
+    , retroList = Nothing
+    , retroName = ""
     , stage = Thinking
     , retro = Retro.empty
     , input = ""
     , dnd = DragAndDrop.empty
     , flags = flags
-    } ! [ storageGet "id" ]
+    } ! [ storageGet "id", getRetros ]
 
 -- Update
 
@@ -73,6 +80,11 @@ port storageGet : String -> Cmd msg
 port storageGot : (Maybe String -> msg) -> Sub msg
 
 type Msg = SetId (Maybe String)
+         | SetRetroName String
+         | CreateRetro
+         | GotRetros (Result Http.Error (List String))
+         | SetRetro String
+         | ClearRetro
          | Socket String
          | ChangeInput String String
          | SetStage Stage
@@ -80,61 +92,117 @@ type Msg = SetId (Maybe String)
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
 
+getRetros : Cmd Msg
+getRetros =
+     Http.get "/retros" (Decode.list Decode.string)
+         |> Http.send GotRetros
+
+createRetro : String -> Cmd Msg
+createRetro name =
+    Http.post "/retros" (Http.jsonBody (Encode.string name)) (Decode.list Decode.string)
+        |> Http.send GotRetros
+
+joinRetro : Model -> (Model, Cmd Msg)
+joinRetro model =
+    let
+        f id retroId token =
+            Sock.init (webSocketUrl model.flags) id retroId id token
+    in
+        case Maybe.map3 f model.user model.retroId model.token of
+            Just cmd -> (model, cmd)
+            Nothing -> (model, Cmd.none)
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        ClearRetro ->
+            { model | retroId = Nothing, retro = Retro.empty } ! []
+
+        SetRetroName input ->
+            { model | retroName = input } ! []
+
+        CreateRetro ->
+            model ! [ createRetro model.retroName ]
+
+        GotRetros resp ->
+            case resp of
+                Ok retros ->
+                    { model | retroList = Just retros } ! []
+                _ ->
+                    model ! []
+
+        SetRetro retroId ->
+            joinRetro { model | retroId = Just retroId }
+
         Vote columnId cardId ->
-            model ! [ Sock.vote (webSocketUrl model.flags) model.user columnId cardId ]
+            case model.user of
+                Just userId ->
+                    model ! [ Sock.vote (webSocketUrl model.flags) userId columnId cardId ]
+                _ ->
+                    model ! []
 
         SetId (Just parts) ->
             case String.split ";" parts of
                 [id, token] ->
-                    { model | user = id, joined = True } !
-                        [ Sock.init (webSocketUrl model.flags) id id token ]
+                    joinRetro { model | user = Just id, token = Just token }
                 _ ->
-                    { model | user = "", joined = False } ! []
+                    { model | user = Nothing } ! []
 
         SetStage stage ->
-            { model | stage = stage } !
-                [ Sock.stage (webSocketUrl model.flags) model.user (toString stage) ]
+            case model.user of
+                Just userId ->
+                    { model | stage = stage } ! [ Sock.stage (webSocketUrl model.flags) userId (toString stage) ]
+                _ ->
+                    model ! []
 
         Reveal columnId cardId ->
-            model ! [ Sock.reveal (webSocketUrl model.flags) model.user columnId cardId ]
+            case model.user of
+                Just userId ->
+                    model ! [ Sock.reveal (webSocketUrl model.flags) userId columnId cardId ]
+                _ ->
+                    model ! []
 
         DnD subMsg ->
-            case DragAndDrop.isDrop subMsg model.dnd of
-                Just ((columnFrom, cardFrom), (columnTo, maybeCardTo)) ->
-                    case model.stage of
-                        Thinking ->
-                            if columnFrom /= columnTo then
-                                { model | dnd = DragAndDrop.empty } !
-                                    [ Sock.move (webSocketUrl model.flags) model.user columnFrom columnTo cardFrom ]
-                            else
-                                model ! []
-
-                        Voting ->
-                            case maybeCardTo of
-                                Just cardTo ->
-                                    if cardFrom /= cardTo then
-                                        { model | dnd = DragAndDrop.empty } ! [ Sock.group (webSocketUrl model.flags) model.user columnFrom cardFrom columnTo cardTo ]
+            case model.user of
+                Just userId ->
+                    case DragAndDrop.isDrop subMsg model.dnd of
+                        Just ((columnFrom, cardFrom), (columnTo, maybeCardTo)) ->
+                            case model.stage of
+                                Thinking ->
+                                    if columnFrom /= columnTo then
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.move (webSocketUrl model.flags) userId columnFrom columnTo cardFrom ]
                                     else
                                         model ! []
-                                Nothing ->
+
+                                Voting ->
+                                    case maybeCardTo of
+                                        Just cardTo ->
+                                            if cardFrom /= cardTo then
+                                                { model | dnd = DragAndDrop.empty } ! [ Sock.group (webSocketUrl model.flags) userId columnFrom cardFrom columnTo cardTo ]
+                                            else
+                                                model ! []
+                                        Nothing ->
+                                            model ! []
+
+                                _ ->
                                     model ! []
 
-                        _ ->
-                            model ! []
+                        Nothing ->
+                            { model | dnd = DragAndDrop.update subMsg model.dnd } ! []
 
-                Nothing ->
-                    { model | dnd = DragAndDrop.update subMsg model.dnd } ! []
+                _ ->
+                    model ! []
 
         ChangeInput columnId input ->
-            if String.endsWith "\n" input && String.trim model.input /= "" then
-                { model | input = "" } !
-                    [ Sock.add (webSocketUrl model.flags) model.user columnId model.input ]
-            else
-                { model | input = String.trim input } ! []
+            case model.user of
+                Just userId ->
+                    if String.endsWith "\n" input && String.trim model.input /= "" then
+                        { model | input = "" } ! [ Sock.add (webSocketUrl model.flags) userId columnId model.input ]
+                    else
+                        { model | input = String.trim input } ! []
+                _ ->
+                    model ! []
 
         Socket data ->
             Sock.update data model socketUpdate
@@ -173,9 +241,9 @@ socketUpdate (id, msgData) model =
             in
                 { model | retro = Retro.addContent columnId cardId content model.retro } ! []
 
-        Sock.Column { columnId, columnName } ->
+        Sock.Column { columnId, columnName, columnOrder } ->
             let
-                column = { id = columnId, name = columnName, cards = Dict.empty }
+                column = { id = columnId, name = columnName, order = columnOrder, cards = Dict.empty }
             in
                 { model | retro = Retro.addColumn column model.retro } ! []
 
@@ -199,7 +267,7 @@ handleError : String -> Model -> (Model, Cmd Msg)
 handleError error model =
     case error of
         "unknown_user" ->
-            { model | user = "", joined = False } ! []
+            { model | user = Nothing } ! []
 
         _ ->
             model ! []
@@ -208,38 +276,85 @@ handleError error model =
 
 view : Model -> Html Msg
 view model =
-    let
-        tabs =
-            Html.section [ Attr.class "section" ]
-                [ Html.div [ Attr.class "container is-fluid" ]
-                      [ tabsView model.stage
-                      , columnsView model.user model.stage model.dnd model.retro.columns
-                      ]
+    case model.user of
+        Just userId ->
+            if model.retroId == Nothing then
+                Html.div []
+                    [ retroView userId model
+                    , footer
+                    , retroListModal model
+                    ]
+            else
+                Html.div []
+                    [ retroView userId model
+                    , footer
+                    ]
+        Nothing ->
+            Html.div []
+                [ footer
+                , signInModal
                 ]
 
-        footer =
-          Html.footer [ Attr.class "footer" ]
-            [ Html.div [ Attr.class "container" ]
-                  [ Html.div [ Attr.class "content has-text-centered" ]
-                        [ Html.text "A link to github?"
+retroView : String -> Model -> Html Msg
+retroView userId model =
+    Html.section [ Attr.class "section" ]
+        [ Html.div [ Attr.class "container is-fluid" ]
+              [ tabsView model.stage
+              , columnsView userId model.stage model.dnd model.retro.columns
+              ]
+        ]
+
+
+retroListModal : Model -> Html Msg
+retroListModal model =
+    let
+        title =
+            Html.h1 [ Attr.class "title" ]
+                [ Html.text "Retros" ]
+
+        choice name =
+            Html.button [ Attr.class "button"
+                        , Event.onClick (SetRetro name)
                         ]
-                  ]
+                [ Html.text name ]
+
+        choices =
+            List.map choice (Maybe.withDefault [] model.retroList)
+    in
+        Bulma.modal
+            [ Bulma.box []
+                  (title :: choices)
+            , Bulma.box []
+                [ Html.input [ Event.onInput SetRetroName ]
+                      [ ]
+                , Html.button [ Attr.class "button"
+                              , Event.onClick CreateRetro ]
+                    [ Html.text "Create" ]
+                ]
             ]
 
-        modal =
-          Bulma.modal
-            [ Bulma.box []
-                  [ Html.a [ Attr.class "button is-primary"
-                           , Attr.href "/oauth/login"
-                           ]
-                        [ Html.text "Sign-in with GitHub" ]
-                  ]
-            ]
-    in
-        if model.joined then
-            Html.div [] [ tabs, footer ]
-        else
-            Html.div [] [ tabs, footer, modal ]
+
+signInModal : Html msg
+signInModal =
+    Bulma.modal
+        [ Bulma.box []
+              [ Html.a [ Attr.class "button is-primary"
+                       , Attr.href "/oauth/login"
+                       ]
+                    [ Html.text "Sign-in with GitHub" ]
+              ]
+        ]
+
+
+footer : Html msg
+footer =
+    Html.footer [ Attr.class "footer" ]
+        [ Html.div [ Attr.class "container" ]
+              [ Html.div [ Attr.class "content has-text-centered" ]
+                    [ Html.text "A link to github?"
+                    ]
+              ]
+        ]
 
 
 tabsView : Stage -> Html Msg
@@ -261,7 +376,8 @@ tabsView stage =
                   ]
             , Html.ul [ Attr.class "is-right" ]
                 [ Html.li []
-                      [ Html.a [] [ Html.text "05:03 remaining" ]
+                      [ Html.a [ Event.onClick ClearRetro ]
+                            [ Html.text "Quit" ]
                       ]
                 ]
             ]
@@ -318,7 +434,7 @@ columnsView connId stage dnd columns =
 
     else
         Dict.toList columns
-            |> List.sortBy (fst)
+            |> List.sortBy (snd >> .order)
             |> List.map (columnView connId stage dnd)
             |> Bulma.columns [ ]
 

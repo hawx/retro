@@ -7,10 +7,11 @@ import (
 )
 
 type Conn struct {
-	Name string
-	Err  error
-	hub  *hub
-	ws   *websocket.Conn
+	Name    string
+	Err     error
+	RetroId string
+	hub     *hub
+	ws      *websocket.Conn
 }
 
 func (c *Conn) send(msg Msg) error {

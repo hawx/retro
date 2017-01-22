@@ -43,13 +43,14 @@ stageDecoder =
     Pipeline.decode StageData
         |> Pipeline.required "stage" Decode.string
 
-type alias ColumnData = { columnId : String, columnName : String }
+type alias ColumnData = { columnId : String, columnName : String, columnOrder : Int }
 
 columnDecoder : Decode.Decoder ColumnData
 columnDecoder =
     Pipeline.decode ColumnData
         |> Pipeline.required "columnId" Decode.string
         |> Pipeline.required "columnName" Decode.string
+        |> Pipeline.required "columnOrder" Decode.int
 
 type alias CardData = { columnId : String, cardId : String, revealed : Bool, votes : Int }
 
@@ -138,11 +139,12 @@ update data model f =
     in
         Sock.LowLevel.update data model runMux
 
-init : String -> String -> String -> String -> Cmd msg
-init url id name token =
+init : String -> String -> String -> String -> String -> Cmd msg
+init url id retroId name token =
     Sock.LowLevel.send url id "init" <|
         Encode.object
-            [ ("name", Encode.string name)
+            [ ("retroId", Encode.string retroId)
+            , ("name", Encode.string name)
             , ("token", Encode.string token)
             ]
 

@@ -5,8 +5,8 @@ type Retro struct {
 	Stage string
 }
 
-func (d *Database) EnsureRetro(retro Retro) error {
-	_, err := d.db.Exec("INSERT OR IGNORE INTO retros(Id, Stage) VALUES (?, ?)",
+func (d *Database) AddRetro(retro Retro) error {
+	_, err := d.db.Exec("INSERT INTO retros(Id, Stage) VALUES (?, ?)",
 		retro.Id,
 		retro.Stage)
 
@@ -21,6 +21,24 @@ func (d *Database) GetRetro(id string) (Retro, error) {
 	err := row.Scan(&retro.Id, &retro.Stage)
 
 	return retro, err
+}
+
+func (d *Database) GetRetros() (retros []Retro, err error) {
+	rows, err := d.db.Query("SELECT Id, Stage FROM retros")
+	if err != nil {
+		return retros, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var retro Retro
+		if err = rows.Scan(&retro.Id, &retro.Stage); err != nil {
+			return retros, err
+		}
+		retros = append(retros, retro)
+	}
+
+	return retros, rows.Err()
 }
 
 func (d *Database) SetStage(id, stage string) error {

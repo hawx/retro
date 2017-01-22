@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"hawx.me/code/mux"
 	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
@@ -39,8 +40,9 @@ type stageData struct {
 }
 
 type columnData struct {
-	ColumnId   string `json:"columnId"`
-	ColumnName string `json:"columnName"`
+	ColumnId    string `json:"columnId"`
+	ColumnName  string `json:"columnName"`
+	ColumnOrder int    `json:"columnOrder"`
 }
 
 type cardData struct {
@@ -80,19 +82,17 @@ type voteData struct {
 }
 
 type Room struct {
-	retroId string
-	server  *sock.Server
-	db      *database.Database
+	server *sock.Server
+	db     *database.Database
 
 	mu    sync.RWMutex
 	users map[string]string
 }
 
-func NewRoom(retroId string, db *database.Database) *Room {
+func NewRoom(db *database.Database) *Room {
 	room := &Room{
-		retroId: retroId,
-		db:      db,
-		server:  sock.NewServer(),
+		db:     db,
+		server: sock.NewServer(),
 	}
 
 	registerHandlers(room, room.server)
@@ -123,8 +123,9 @@ func (r *Room) IsUser(user, token string) bool {
 func registerHandlers(r *Room, mux *sock.Server) {
 	mux.Handle("init", func(conn *sock.Conn, data []byte) {
 		var args struct {
-			Name  string
-			Token string
+			RetroId string
+			Name    string
+			Token   string
 		}
 		if err := json.Unmarshal(data, &args); err != nil {
 			log.Println("init:", err)
@@ -140,15 +141,24 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		retro, _ := r.db.GetRetro(r.retroId)
+		retro, err := r.db.GetRetro(args.RetroId)
+		if err != nil {
+			log.Println("init", args.RetroId, err)
+			return
+		}
+		conn.RetroId = args.RetroId
 
 		if retro.Stage != "" {
 			conn.Send("", "stage", stageData{retro.Stage})
 		}
 
-		columns, _ := r.db.GetColumns(r.retroId)
+		columns, err := r.db.GetColumns(args.RetroId)
+		if err != nil {
+			log.Println("columns", err)
+			return
+		}
 		for _, column := range columns {
-			conn.Send("", "column", columnData{column.Id, column.Name})
+			conn.Send("", "column", columnData{column.Id, column.Name, column.Order})
 
 			cards, _ := r.db.GetCards(column.Id)
 			for _, card := range cards {
@@ -212,7 +222,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.db.SetStage(r.retroId, args.Stage)
+		r.db.SetStage(conn.RetroId, args.Stage)
 
 		conn.Broadcast(conn.Name, "stage", args)
 	})
@@ -272,46 +282,14 @@ func main() {
 	}
 	defer db.Close()
 
-	retroId := "hey"
-
-	db.EnsureRetro(database.Retro{
-		Id:    retroId,
-		Stage: "",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "0",
-		Retro: retroId,
-		Name:  "Start",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "1",
-		Retro: retroId,
-		Name:  "More",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "2",
-		Retro: retroId,
-		Name:  "Keep",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "3",
-		Retro: retroId,
-		Name:  "Less",
-	})
-
-	db.EnsureColumn(database.Column{
-		Id:    "4",
-		Retro: retroId,
-		Name:  "Stop",
-	})
-
-	room := NewRoom("hey", db)
+	room := NewRoom(db)
 
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
+
+	http.Handle("/retros", mux.Method{
+		"GET":  http.HandlerFunc(room.listRetros),
+		"POST": http.HandlerFunc(room.createRetro),
+	})
 
 	http.Handle("/ws", room.server)
 
@@ -406,4 +384,72 @@ func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
+	var list []string
+	retros, _ := room.db.GetRetros()
+
+	for _, retro := range retros {
+		list = append(list, retro.Id)
+	}
+
+	json.NewEncoder(w).Encode(list)
+}
+
+func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
+	var retroId string
+	if err := json.NewDecoder(r.Body).Decode(&retroId); err != nil {
+		log.Println(err)
+		return
+	}
+
+	room.db.AddRetro(database.Retro{
+		Id:    retroId,
+		Stage: "",
+	})
+
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
+		Retro: retroId,
+		Name:  "Start",
+		Order: 0,
+	})
+
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
+		Retro: retroId,
+		Name:  "More",
+		Order: 1,
+	})
+
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
+		Retro: retroId,
+		Name:  "Keep",
+		Order: 2,
+	})
+
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
+		Retro: retroId,
+		Name:  "Less",
+		Order: 3,
+	})
+
+	room.db.AddColumn(database.Column{
+		Id:    strId(),
+		Retro: retroId,
+		Name:  "Stop",
+		Order: 4,
+	})
+
+	var list []string
+	retros, _ := room.db.GetRetros()
+
+	for _, retro := range retros {
+		list = append(list, retro.Id)
+	}
+
+	json.NewEncoder(w).Encode(list)
 }
