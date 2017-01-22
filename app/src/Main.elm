@@ -18,6 +18,7 @@ import Card exposing (Card, Content)
 import Retro exposing (Retro)
 import Sock
 import DragAndDrop
+import Html.Events.Extra as ExtraEvent
 
 main =
     Html.programWithFlags
@@ -87,6 +88,7 @@ type Msg = SetId (Maybe String)
          | ClearRetro
          | Socket String
          | ChangeInput String String
+         | CreateCard String
          | SetStage Stage
          | Reveal String String
          | Vote String String
@@ -195,13 +197,13 @@ update msg model =
                     model ! []
 
         ChangeInput columnId input ->
+            { model | input = String.trim input } ! []
+
+        CreateCard columnId ->
             case model.user of
                 Just userId ->
-                    if String.endsWith "\n" input && String.trim model.input /= "" then
-                        { model | input = "" } ! [ Sock.add (webSocketUrl model.flags) userId columnId model.input ]
-                    else
-                        { model | input = String.trim input } ! []
-                _ ->
+                    { model | input = "" } ! [ Sock.add (webSocketUrl model.flags) userId columnId model.input ]
+                Nothing ->
                     model ! []
 
         Socket data ->
@@ -549,6 +551,7 @@ addCardView columnId =
         [ Bulma.cardContent []
               [ Bulma.content []
                     [ Html.textarea [ Event.onInput (ChangeInput columnId)
+                                    , ExtraEvent.onEnter (CreateCard columnId)
                                     , Attr.placeholder "Add a card..."
                                     ]
                           [ ]
