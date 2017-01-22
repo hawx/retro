@@ -288,7 +288,7 @@ func main() {
 	)
 	flag.Parse()
 
-	db, err := database.Open(dbPath)
+	db, err := database.Open(*dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
