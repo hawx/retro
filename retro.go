@@ -284,10 +284,11 @@ func main() {
 		port   = flag.String("port", "8080", "")
 		socket = flag.String("socket", "", "")
 		assets = flag.String("assets", "app/dist", "")
+		dbPath = flag.String("db", "./db", "")
 	)
 	flag.Parse()
 
-	db, err := database.Open("./db")
+	db, err := database.Open(dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
