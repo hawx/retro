@@ -2,20 +2,10 @@ port module Main exposing (main)
 
 import Http
 import Bulma
-import Debug
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Html.Events as Event
 import String
-import Dict exposing (Dict)
-import Array exposing (Array)
-import WebSocket
-import Json.Decode as Decode
-import Json.Decode.Pipeline as Pipeline
-import Json.Encode as Encode
 import Sock
-import DragAndDrop
-import Html.Events.Extra as ExtraEvent
 import Navigation
 import Route
 import Page.Menu as Menu
@@ -189,7 +179,7 @@ view model =
                 Html.div []
                     [ Html.map RetroMsg (Retro.view userId model.retro)
                     , footer
-                    , retroListModal model
+                    , Html.map MenuMsg (Menu.view model.menu)
                     ]
             else
                 Html.div []
@@ -201,11 +191,6 @@ view model =
                 [ footer
                 , signInModal
                 ]
-
-
-retroListModal : Model -> Html Msg
-retroListModal model =
-    Html.map MenuMsg (Menu.view model.menu)
 
 
 signInModal : Html msg
