@@ -20,6 +20,7 @@ import Sock
 import DragAndDrop
 import Html.Events.Extra as ExtraEvent
 import Navigation
+import Route
 
 main =
     Navigation.programWithFlags UrlChange
@@ -217,14 +218,15 @@ update msg model =
 
 urlChange : Navigation.Location -> Model -> (Model, Cmd Msg)
 urlChange location model =
-    let
-        path = String.dropLeft 2 location.hash
-    in
-        if path == "" then
+    case Route.parse location of
+        Just Route.Menu ->
             { model | retroId = Nothing, retro = Retro.empty } ! []
 
-        else
-            joinRetro { model | retroId = Just path, retro = Retro.empty }
+        Just (Route.Retro retroId) ->
+            joinRetro { model | retroId = Just retroId, retro = Retro.empty }
+
+        _ ->
+            model ! []
 
 
 socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
@@ -331,7 +333,7 @@ retroListModal model =
 
         choice name =
             Html.a [ Attr.class "button"
-                   , Attr.href ("#/" ++ name)
+                   , Attr.href (Route.toUrl (Route.Retro name))
                    ]
                 [ Html.text name ]
 
@@ -393,7 +395,7 @@ tabsView stage =
                   ]
             , Html.ul [ Attr.class "is-right" ]
                 [ Html.li []
-                      [ Html.a [ Attr.href "#/" ]
+                      [ Html.a [ Attr.href (Route.toUrl Route.Menu) ]
                             [ Html.text "Quit" ]
                       ]
                 ]
