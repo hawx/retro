@@ -91,8 +91,6 @@ type Msg = SetId (Maybe String)
          | SetRetroName String
          | CreateRetro
          | GotRetros (Result Http.Error (List String))
-         | SetRetro String
-         | ClearRetro
          | Socket String
          | ChangeInput String String
          | CreateCard String
@@ -126,9 +124,6 @@ joinRetro model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        ClearRetro ->
-            { model | retroId = Nothing, retro = Retro.empty } ! []
-
         SetRetroName input ->
             { model | retroName = input } ! []
 
@@ -141,9 +136,6 @@ update msg model =
                     { model | retroList = Just retros } ! []
                 _ ->
                     model ! []
-
-        SetRetro retroId ->
-            joinRetro { model | retroId = Just retroId }
 
         Vote columnId cardId ->
             case model.user of
