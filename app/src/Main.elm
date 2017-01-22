@@ -84,6 +84,7 @@ type Msg = SetId (Maybe String)
          | CreateRetro
          | GotRetros (Result Http.Error (List String))
          | SetRetro String
+         | ClearRetro
          | Socket String
          | ChangeInput String String
          | SetStage Stage
@@ -115,6 +116,9 @@ joinRetro model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        ClearRetro ->
+            { model | retroId = Nothing, retro = Retro.empty } ! []
+
         SetRetroName input ->
             { model | retroName = input } ! []
 
@@ -272,63 +276,85 @@ handleError error model =
 
 view : Model -> Html Msg
 view model =
-    let
-        tabs =
-            Html.section [ Attr.class "section" ]
-                [ Html.div [ Attr.class "container is-fluid" ]
-                      [ tabsView model.stage
-                      , columnsView (Maybe.withDefault "what, please fix this" model.user) model.stage model.dnd model.retro.columns
-                      ]
-                ]
-
-        footer =
-            Html.footer [ Attr.class "footer" ]
-                [ Html.div [ Attr.class "container" ]
-                      [ Html.div [ Attr.class "content has-text-centered" ]
-                            [ Html.text "A link to github?"
-                            ]
-                      ]
-                ]
-
-        modal =
-            Bulma.modal
-                [ Bulma.box []
-                      [ Html.a [ Attr.class "button is-primary"
-                               , Attr.href "/oauth/login"
-                               ]
-                            [ Html.text "Sign-in with GitHub" ]
-                      ]
-                ]
-
-        retroList =
-            Bulma.modal
-                [ Bulma.box [] <|
-                      List.concat
-                      [ [ Html.h1 [] [ Html.text "Retros" ]
-                        ]
-                      , List.map (\name ->
-                                    Html.button [ Attr.class "button"
-                                                , Event.onClick (SetRetro name)
-                                                ]
-                                    [ Html.text name ]
-                               ) (Maybe.withDefault [] model.retroList)
-                      ]
-                , Bulma.box []
-                    [ Html.input [ Event.onInput SetRetroName ]
-                          [ ]
-                    , Html.button [ Attr.class "button"
-                                  , Event.onClick CreateRetro ]
-                          [ Html.text "Create" ]
+    case model.user of
+        Just userId ->
+            if model.retroId == Nothing then
+                Html.div []
+                    [ retroView userId model
+                    , footer
+                    , retroListModal model
                     ]
+            else
+                Html.div []
+                    [ retroView userId model
+                    , footer
+                    ]
+        Nothing ->
+            Html.div []
+                [ footer
+                , signInModal
                 ]
 
+retroView : String -> Model -> Html Msg
+retroView userId model =
+    Html.section [ Attr.class "section" ]
+        [ Html.div [ Attr.class "container is-fluid" ]
+              [ tabsView model.stage
+              , columnsView userId model.stage model.dnd model.retro.columns
+              ]
+        ]
+
+
+retroListModal : Model -> Html Msg
+retroListModal model =
+    let
+        title =
+            Html.h1 [ Attr.class "title" ]
+                [ Html.text "Retros" ]
+
+        choice name =
+            Html.button [ Attr.class "button"
+                        , Event.onClick (SetRetro name)
+                        ]
+                [ Html.text name ]
+
+        choices =
+            List.map choice (Maybe.withDefault [] model.retroList)
     in
-        if model.user == Nothing then
-            Html.div [] [ tabs, footer, modal ]
-        else if model.retroId == Nothing then
-            Html.div [] [ tabs, footer, retroList ]
-        else
-            Html.div [] [ tabs, footer ]
+        Bulma.modal
+            [ Bulma.box []
+                  (title :: choices)
+            , Bulma.box []
+                [ Html.input [ Event.onInput SetRetroName ]
+                      [ ]
+                , Html.button [ Attr.class "button"
+                              , Event.onClick CreateRetro ]
+                    [ Html.text "Create" ]
+                ]
+            ]
+
+
+signInModal : Html msg
+signInModal =
+    Bulma.modal
+        [ Bulma.box []
+              [ Html.a [ Attr.class "button is-primary"
+                       , Attr.href "/oauth/login"
+                       ]
+                    [ Html.text "Sign-in with GitHub" ]
+              ]
+        ]
+
+
+footer : Html msg
+footer =
+    Html.footer [ Attr.class "footer" ]
+        [ Html.div [ Attr.class "container" ]
+              [ Html.div [ Attr.class "content has-text-centered" ]
+                    [ Html.text "A link to github?"
+                    ]
+              ]
+        ]
 
 
 tabsView : Stage -> Html Msg
@@ -350,7 +376,8 @@ tabsView stage =
                   ]
             , Html.ul [ Attr.class "is-right" ]
                 [ Html.li []
-                      [ Html.a [] [ Html.text "05:03 remaining" ]
+                      [ Html.a [ Event.onClick ClearRetro ]
+                            [ Html.text "Quit" ]
                       ]
                 ]
             ]
