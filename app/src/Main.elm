@@ -21,6 +21,7 @@ import DragAndDrop
 import Html.Events.Extra as ExtraEvent
 import Navigation
 import Route
+import Menu
 
 main =
     Navigation.programWithFlags UrlChange
@@ -57,11 +58,15 @@ type alias Model =
     , input : String
     , dnd : DragAndDrop.Model CardDragging CardOver
     , flags : Flags
+    , menu : Menu.Model
     }
 
 init : Flags -> Navigation.Location -> (Model, Cmd Msg)
 init flags location =
     let
+        (menuModel, menuCmd) =
+            Menu.init
+
         (initModel, initCmd) =
             urlChange
                 location
@@ -74,9 +79,14 @@ init flags location =
                 , input = ""
                 , dnd = DragAndDrop.empty
                 , flags = flags
+                , menu = menuModel
                 }
     in
-        initModel ! [ initCmd, storageGet "id", getRetros ]
+        initModel !
+            [ initCmd
+            , storageGet "id"
+            , Cmd.map MenuMsg menuCmd
+            ]
 
 -- Update
 
@@ -85,9 +95,6 @@ port storageGet : String -> Cmd msg
 port storageGot : (Maybe String -> msg) -> Sub msg
 
 type Msg = SetId (Maybe String)
-         | SetRetroName String
-         | CreateRetro
-         | GotRetros (Result Http.Error (List String))
          | Socket String
          | ChangeInput String String
          | CreateCard String
@@ -96,16 +103,7 @@ type Msg = SetId (Maybe String)
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
          | UrlChange Navigation.Location
-
-getRetros : Cmd Msg
-getRetros =
-     Http.get "/retros" (Decode.list Decode.string)
-         |> Http.send GotRetros
-
-createRetro : String -> Cmd Msg
-createRetro name =
-    Http.post "/retros" (Http.jsonBody (Encode.string name)) (Decode.list Decode.string)
-        |> Http.send GotRetros
+         | MenuMsg Menu.Msg
 
 joinRetro : Model -> (Model, Cmd Msg)
 joinRetro model =
@@ -121,18 +119,12 @@ joinRetro model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        SetRetroName input ->
-            { model | retroName = input } ! []
+        MenuMsg subMsg ->
+            let
+                (menuModel, menuMsg) = Menu.update subMsg model.menu
+            in
+                { model | menu = menuModel } ! [ Cmd.map MenuMsg menuMsg ]
 
-        CreateRetro ->
-            model ! [ createRetro model.retroName ]
-
-        GotRetros resp ->
-            case resp of
-                Ok retros ->
-                    { model | retroList = Just retros } ! []
-                _ ->
-                    model ! []
 
         Vote columnId cardId ->
             case model.user of
@@ -331,31 +323,7 @@ retroView userId model =
 
 retroListModal : Model -> Html Msg
 retroListModal model =
-    let
-        title =
-            Html.h1 [ Attr.class "title" ]
-                [ Html.text "Retros" ]
-
-        choice name =
-            Html.a [ Attr.class "button"
-                   , Attr.href (Route.toUrl (Route.Retro name))
-                   ]
-                [ Html.text name ]
-
-        choices =
-            List.map choice (Maybe.withDefault [] model.retroList)
-    in
-        Bulma.modal
-            [ Bulma.box []
-                  (title :: choices)
-            , Bulma.box []
-                [ Html.input [ Event.onInput SetRetroName ]
-                      [ ]
-                , Html.button [ Attr.class "button"
-                              , Event.onClick CreateRetro ]
-                    [ Html.text "Create" ]
-                ]
-            ]
+    Html.map MenuMsg (Menu.view model.menu)
 
 
 signInModal : Html msg
