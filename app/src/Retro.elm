@@ -4,14 +4,22 @@ import Dict exposing (Dict)
 import Column exposing (Column)
 import Card exposing (Card, Content)
 
+type Stage = Thinking | Presenting | Voting | Discussing
+
 type alias Retro =
     { columns : Dict String Column
+    , stage : Stage
     }
 
 empty : Retro
 empty =
     { columns = Dict.empty
+    , stage = Thinking
     }
+
+setStage : Stage -> Retro -> Retro
+setStage stage retro =
+    { retro | stage = stage }
 
 getCard : String -> String -> Retro -> Maybe Card
 getCard columnId cardId retro =
