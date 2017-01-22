@@ -34,6 +34,7 @@ empty =
 
 type Msg = ChangeInput String String
          | CreateCard String
+         | DeleteCard String String
          | SetStage Retro.Stage
          | Reveal String String
          | Vote String String
@@ -83,6 +84,10 @@ update sockUrl userId msg model =
 
         CreateCard columnId ->
             { model | input = "" } ! [ Sock.add sockUrl userId columnId model.input ]
+
+        DeleteCard columnId cardId ->
+            model ! [ Sock.delete sockUrl userId columnId cardId ]
+
 
 
 
@@ -144,6 +149,9 @@ socketUpdate (id, msgData) model =
 
         Sock.Vote { columnId, cardId } ->
             { model | retro = Retro.voteCard columnId cardId model.retro } ! []
+
+        Sock.Delete { columnId, cardId } ->
+            { model | retro = Retro.removeCard columnId cardId model.retro } ! []
 
         _ ->
             model ! []
@@ -248,7 +256,9 @@ cardView connId stage dnd columnId (cardId, card) =
         Retro.Thinking ->
             if Card.authored connId card then
                 [ Bulma.card (DragAndDrop.draggable DnD (columnId, cardId))
-                      [ Bulma.cardContent [] [ contentsView card.contents ] ]
+                      [ Bulma.delete [ Event.onClick (DeleteCard columnId cardId) ]
+                      , Bulma.cardContent [] [ contentsView card.contents ]
+                      ]
                 ]
             else
                 []

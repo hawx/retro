@@ -62,3 +62,7 @@ input attrs =
     Html.p [ Attr.class "control" ]
         [ Html.input ([Attr.class "input", Attr.type_ "text" ] ++ attrs) []
         ]
+
+delete : List (Html.Attribute msg) -> Html msg
+delete attrs =
+    Html.button (Attr.class "delete" :: attrs) []

@@ -262,6 +262,17 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 		conn.Broadcast(conn.Name, "vote", args)
 	})
+
+	mux.Handle("delete", func(conn *sock.Conn, data []byte) {
+		var args voteData
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.db.DeleteCard(args.CardId)
+
+		conn.Broadcast(conn.Name, "delete", args)
+	})
 }
 
 func main() {

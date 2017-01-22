@@ -49,6 +49,13 @@ func (d *Database) VoteCard(id string) error {
 	return err
 }
 
+func (d *Database) DeleteCard(id string) error {
+	_, err := d.db.Exec("DELETE FROM cards WHERE Id=?",
+		id)
+
+	return err
+}
+
 func (d *Database) GroupCards(cardFrom, cardTo string) error {
 	tx, err := d.db.Begin()
 	if err != nil {
