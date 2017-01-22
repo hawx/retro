@@ -19,9 +19,10 @@ import Retro exposing (Retro)
 import Sock
 import DragAndDrop
 import Html.Events.Extra as ExtraEvent
+import Navigation
 
 main =
-    Html.programWithFlags
+    Navigation.programWithFlags UrlChange
         { init = init
         , view = view
         , update = update
@@ -60,19 +61,25 @@ type alias Model =
     , flags : Flags
     }
 
-init : Flags -> (Model, Cmd Msg)
-init flags =
-    { user = Nothing
-    , token = Nothing
-    , retroId = Nothing
-    , retroList = Nothing
-    , retroName = ""
-    , stage = Thinking
-    , retro = Retro.empty
-    , input = ""
-    , dnd = DragAndDrop.empty
-    , flags = flags
-    } ! [ storageGet "id", getRetros ]
+init : Flags -> Navigation.Location -> (Model, Cmd Msg)
+init flags location =
+    let
+        (initModel, initCmd) =
+            urlChange
+                location
+                { user = Nothing
+                , token = Nothing
+                , retroId = Nothing
+                , retroList = Nothing
+                , retroName = ""
+                , stage = Thinking
+                , retro = Retro.empty
+                , input = ""
+                , dnd = DragAndDrop.empty
+                , flags = flags
+                }
+    in
+        initModel ! [ initCmd, storageGet "id", getRetros ]
 
 -- Update
 
@@ -93,6 +100,7 @@ type Msg = SetId (Maybe String)
          | Reveal String String
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
+         | UrlChange Navigation.Location
 
 getRetros : Cmd Msg
 getRetros =
@@ -209,8 +217,23 @@ update msg model =
         Socket data ->
             Sock.update data model socketUpdate
 
+        UrlChange location ->
+            urlChange location model
+
         _ ->
             model ! []
+
+urlChange : Navigation.Location -> Model -> (Model, Cmd Msg)
+urlChange location model =
+    let
+        path = String.dropLeft 2 location.hash
+    in
+        if path == "" then
+            { model | retroId = Nothing, retro = Retro.empty } ! []
+
+        else
+            joinRetro { model | retroId = Just path, retro = Retro.empty }
+
 
 socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
 socketUpdate (id, msgData) model =
@@ -315,9 +338,9 @@ retroListModal model =
                 [ Html.text "Retros" ]
 
         choice name =
-            Html.button [ Attr.class "button"
-                        , Event.onClick (SetRetro name)
-                        ]
+            Html.a [ Attr.class "button"
+                   , Attr.href ("#/" ++ name)
+                   ]
                 [ Html.text name ]
 
         choices =
@@ -378,7 +401,7 @@ tabsView stage =
                   ]
             , Html.ul [ Attr.class "is-right" ]
                 [ Html.li []
-                      [ Html.a [ Event.onClick ClearRetro ]
+                      [ Html.a [ Attr.href "#/" ]
                             [ Html.text "Quit" ]
                       ]
                 ]
