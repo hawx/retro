@@ -7,6 +7,7 @@ module Sock exposing ( listen
                      , reveal
                      , group
                      , vote
+                     , delete
                      , MsgData(..))
 
 {-| This module provides a domain wrapper on top of the websocket format for the
@@ -28,6 +29,7 @@ type MsgData = Error ErrorData
              | Reveal RevealData
              | Group GroupData
              | Vote VoteData
+             | Delete VoteData
 
 type alias ErrorData = { error : String }
 
@@ -127,6 +129,7 @@ update data model f =
               , ("group", runOp groupDecoder Group)
               , ("vote", runOp voteDecoder Vote)
               , ("error", runOp errorDecoder Error)
+              , ("delete", runOp voteDecoder Delete)
               ]
 
         runMux { id, op, data } model =
@@ -193,6 +196,14 @@ group url id columnFrom cardFrom columnTo cardTo =
 vote : String -> String -> String -> String -> Cmd msg
 vote url id columnId cardId =
     Sock.LowLevel.send url id "vote" <|
+        Encode.object
+            [ ("columnId", Encode.string columnId)
+            , ("cardId", Encode.string cardId)
+            ]
+
+delete : String -> String -> String -> String -> Cmd msg
+delete url id columnId cardId =
+    Sock.LowLevel.send url id "delete" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardId", Encode.string cardId)
