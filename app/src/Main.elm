@@ -21,7 +21,7 @@ import DragAndDrop
 import Html.Events.Extra as ExtraEvent
 import Navigation
 import Route
-import Menu
+import Page.Menu as Menu
 
 main =
     Navigation.programWithFlags UrlChange

@@ -1,4 +1,4 @@
-module Menu exposing (..)
+module Page.Menu exposing (..)
 
 import Http
 import Html exposing (Html)
