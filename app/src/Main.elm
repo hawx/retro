@@ -7,7 +7,7 @@ import Html.Attributes as Attr
 import String
 import Sock
 import Navigation
-import Route
+import Route exposing (Route)
 import Page.Menu as Menu
 import Page.Retro as Retro
 
@@ -34,7 +34,8 @@ webSocketUrl flags =
 -- Model
 
 type alias Model =
-    { user : Maybe String
+    { route : Route
+    , user : Maybe String
     , token : Maybe String
     , retroId : Maybe String
     , flags : Flags
@@ -54,7 +55,8 @@ init flags location =
         (initModel, initCmd) =
             urlChange
                 location
-                { user = Nothing
+                { route = Route.Menu
+                , user = Nothing
                 , token = Nothing
                 , retroId = Nothing
                 , flags = flags
@@ -81,31 +83,48 @@ type Msg = SetId (Maybe String)
          | MenuMsg Menu.Msg
          | RetroMsg Retro.Msg
 
+userConnect : String -> Model -> (Model, Cmd Msg)
+userConnect userId model =
+    case model.route of
+        Route.Menu ->
+            model ! [ Cmd.map MenuMsg (Menu.mount (sockSender model.flags userId)) ]
+
+        Route.Retro _ ->
+            joinRetro model
+
 joinRetro : Model -> (Model, Cmd Msg)
 joinRetro model =
     let
         f id retroId token =
-            Sock.init (webSocketUrl model.flags) id retroId id token
+            Sock.init (sockSender model.flags id) retroId id token
     in
         case Maybe.map3 f model.user model.retroId model.token of
             Just cmd -> (model, cmd)
             Nothing -> (model, Cmd.none)
 
+sockSender : Flags -> String -> Sock.Sender msg
+sockSender flags userId =
+    Sock.send (webSocketUrl flags) userId
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         MenuMsg subMsg ->
-            let
-                (menuModel, menuMsg) = Menu.update subMsg model.menu
-            in
-                { model | menu = menuModel } ! [ Cmd.map MenuMsg menuMsg ]
+            case model.user of
+                Just userId ->
+                    let
+                        (menuModel, menuMsg) = Menu.update (sockSender model.flags userId) subMsg model.menu
+                    in
+                        { model | menu = menuModel } ! [ Cmd.map MenuMsg menuMsg ]
+
+                Nothing ->
+                    model ! []
 
         RetroMsg subMsg ->
             case model.user of
                 Just userId ->
                     let
-                        (retroModel, retroMsg) = Retro.update (webSocketUrl model.flags) userId subMsg model.retro
+                        (retroModel, retroMsg) = Retro.update (sockSender model.flags userId) subMsg model.retro
                     in
                         { model | retro = retroModel } ! [ Cmd.map RetroMsg retroMsg ]
 
@@ -115,7 +134,7 @@ update msg model =
         SetId (Just parts) ->
             case String.split ";" parts of
                 [id, token] ->
-                    joinRetro { model | user = Just id, token = Just token }
+                    userConnect id { model | user = Just id, token = Just token }
                 _ ->
                     { model | user = Nothing } ! []
 
@@ -124,10 +143,17 @@ update msg model =
                 (retroModel, retroCmd) =
                     Sock.update data model.retro Retro.socketUpdate
 
+                (menuModel, menuCmd) =
+                    Sock.update data model.menu Menu.socketUpdate
+
                 (newModel, newCmd) =
                     Sock.update data model socketUpdate
             in
-                { newModel | retro = retroModel } ! [ newCmd, Cmd.map RetroMsg retroCmd ]
+                { newModel
+                    | retro = retroModel
+                    , menu = menuModel
+                }
+                ! [ newCmd, Cmd.map RetroMsg retroCmd, Cmd.map MenuMsg menuCmd ]
 
         UrlChange location ->
             urlChange location model
@@ -138,11 +164,17 @@ update msg model =
 urlChange : Navigation.Location -> Model -> (Model, Cmd Msg)
 urlChange location model =
     case Route.parse location of
-        Just Route.Menu ->
-            { model | retroId = Nothing, retro = Retro.empty } ! []
+        Just (Route.Menu as route) ->
+            { model
+                | route = route
+                , retroId = Nothing
+                , retro = Retro.empty } ! []
 
-        Just (Route.Retro retroId) ->
-            joinRetro { model | retroId = Just retroId, retro = Retro.empty }
+        Just ((Route.Retro retroId) as route) ->
+            joinRetro { model
+                          | route = route
+                          , retroId = Just retroId
+                          , retro = Retro.empty }
 
         _ ->
             model ! []
@@ -220,7 +252,15 @@ footer =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.batch
-        [ Sock.listen (webSocketUrl model.flags) Socket
-        , storageGot SetId
-        ]
+    case model.retroId  of
+        Nothing ->
+            Sub.batch
+                [ Sock.listen (webSocketUrl model.flags) Socket
+                , storageGot SetId
+                , Sub.map MenuMsg (Menu.subscriptions model.menu)
+                ]
+        _ ->
+            Sub.batch
+                [ Sock.listen (webSocketUrl model.flags) Socket
+                , storageGot SetId
+                ]

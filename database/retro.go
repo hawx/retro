@@ -23,8 +23,14 @@ func (d *Database) GetRetro(id string) (Retro, error) {
 	return retro, err
 }
 
-func (d *Database) GetRetros() (retros []Retro, err error) {
-	rows, err := d.db.Query("SELECT Id, Stage FROM retros")
+func (d *Database) GetRetros(username string) (retros []Retro, err error) {
+	rows, err := d.db.Query(`
+    SELECT Id, Stage
+    FROM retros
+    INNER JOIN retro_users
+      ON retros.Id = retro_users.Retro
+    WHERE retro_users.Username = ?`,
+		username)
 	if err != nil {
 		return retros, err
 	}

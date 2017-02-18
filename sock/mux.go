@@ -31,6 +31,10 @@ func (m *mux) serve(conn *Conn) error {
 			continue
 		}
 
+		if conn.Name == "" {
+			conn.Name = msg.Id
+		}
+
 		handler(conn, []byte(msg.Data))
 		if conn.Err != nil {
 			return conn.Err

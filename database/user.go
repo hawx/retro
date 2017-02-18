@@ -22,3 +22,21 @@ func (d *Database) GetUser(username string) (User, error) {
 
 	return user, err
 }
+
+func (d *Database) GetUsers() (users []User, err error) {
+	rows, err := d.db.Query("SELECT Username, Token FROM users")
+	if err != nil {
+		return users, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var user User
+		if err = rows.Scan(&user.Username, &user.Token); err != nil {
+			return users, err
+		}
+		users = append(users, user)
+	}
+
+	return users, rows.Err()
+}

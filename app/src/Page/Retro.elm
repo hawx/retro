@@ -1,4 +1,11 @@
-module Page.Retro exposing (..)
+module Page.Retro exposing ( init
+                           , empty
+                           , Model
+                           , Msg
+                           , update
+                           , socketUpdate
+                           , view
+                           )
 
 import Retro exposing (Retro)
 import DragAndDrop
@@ -40,18 +47,18 @@ type Msg = ChangeInput String String
          | Vote String String
          | DnD (DragAndDrop.Msg (String, String) (String, Maybe String))
 
-update : String -> String -> Msg -> Model -> (Model, Cmd Msg)
-update sockUrl userId msg model =
+update : Sock.Sender Msg -> Msg -> Model -> (Model, Cmd Msg)
+update sender msg model =
     case msg of
         Vote columnId cardId ->
-            model ! [ Sock.vote sockUrl userId columnId cardId ]
+            model ! [ Sock.vote sender columnId cardId ]
 
         SetStage stage ->
             { model | retro = Retro.setStage stage model.retro } !
-                [ Sock.stage sockUrl userId (toString stage) ]
+                [ Sock.stage sender (toString stage) ]
 
         Reveal columnId cardId ->
-            model ! [ Sock.reveal sockUrl userId columnId cardId ]
+            model ! [ Sock.reveal sender columnId cardId ]
 
         DnD subMsg ->
             case DragAndDrop.isDrop subMsg model.dnd of
@@ -59,7 +66,7 @@ update sockUrl userId msg model =
                     case model.retro.stage of
                         Retro.Thinking ->
                             if columnFrom /= columnTo then
-                                { model | dnd = DragAndDrop.empty } ! [ Sock.move sockUrl userId columnFrom columnTo cardFrom ]
+                                { model | dnd = DragAndDrop.empty } ! [ Sock.move sender columnFrom columnTo cardFrom ]
                             else
                                 model ! []
 
@@ -67,7 +74,7 @@ update sockUrl userId msg model =
                             case maybeCardTo of
                                 Just cardTo ->
                                     if cardFrom /= cardTo then
-                                        { model | dnd = DragAndDrop.empty } ! [ Sock.group sockUrl userId columnFrom cardFrom columnTo cardTo ]
+                                        { model | dnd = DragAndDrop.empty } ! [ Sock.group sender columnFrom cardFrom columnTo cardTo ]
                                     else
                                         model ! []
                                 Nothing ->
@@ -83,10 +90,10 @@ update sockUrl userId msg model =
             { model | input = String.trim input } ! []
 
         CreateCard columnId ->
-            { model | input = "" } ! [ Sock.add sockUrl userId columnId model.input ]
+            { model | input = "" } ! [ Sock.add sender columnId model.input ]
 
         DeleteCard columnId cardId ->
-            model ! [ Sock.delete sockUrl userId columnId cardId ]
+            model ! [ Sock.delete sender columnId cardId ]
 
 
 
