@@ -37,7 +37,6 @@ type alias Model =
     { route : Route
     , user : Maybe String
     , token : Maybe String
-    , retroId : Maybe String
     , flags : Flags
     , menu : Menu.Model
     , retro : Retro.Model
@@ -52,7 +51,6 @@ init flags location =
                 { route = Route.Menu
                 , user = Nothing
                 , token = Nothing
-                , retroId = Nothing
                 , flags = flags
                 , menu = Menu.empty
                 , retro = Retro.empty
@@ -153,31 +151,40 @@ routeChange : Route -> Model -> (Model, Cmd Msg)
 routeChange route model =
     case route of
         Route.Menu ->
-            case Maybe.map2 (,) model.user model.token of
-                Just (userId, token) ->
-                    { model
-                        | route = route
-                        , retroId = Nothing
-                        , retro = Retro.empty
-                        , menu = Menu.empty
-                    } ! [ Cmd.map MenuMsg (Menu.mount (sockSender model.flags userId token)) ]
-
-                Nothing ->
-                    model ! []
+            { model
+                | route = route
+                , retro = Retro.empty
+                , menu = Menu.empty
+            } ! [ Cmd.map MenuMsg
+                      (authenticatedCmd model
+                           (\userId token ->
+                                Menu.mount (sockSender model.flags userId token)
+                           )
+                      )
+                ]
 
         Route.Retro retroId ->
-            case Maybe.map2 (,) model.user model.token of
-                Just (userId, token) ->
-                    { model
-                        | route = route
-                        , retroId = Just retroId
-                        , retro = Retro.empty
-                        , menu = Menu.empty
-                    } ! [ Cmd.map RetroMsg (Retro.mount (sockSender model.flags userId token) retroId) ]
+            { model
+                | route = route
+                , retro = Retro.empty
+                , menu = Menu.empty
+            } ! [ Cmd.map RetroMsg
+                      (authenticatedCmd model
+                           (\userId token ->
+                                Retro.mount (sockSender model.flags userId token) retroId
+                           )
+                      )
+                ]
 
-                Nothing ->
-                    model ! []
 
+authenticatedCmd : Model -> (String -> String -> Cmd msg) -> Cmd msg
+authenticatedCmd model cmd =
+    case Maybe.map2 (,) model.user model.token of
+        Just (userId, token) ->
+            cmd userId token
+
+        Nothing ->
+            Cmd.none
 
 socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
 socketUpdate (id, msgData) model =
@@ -259,14 +266,15 @@ footer =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.retroId  of
-        Nothing ->
+    case model.route of
+        Route.Menu ->
             Sub.batch
                 [ Sock.listen (webSocketUrl model.flags) Socket
                 , storageGot SetId
                 , Sub.map MenuMsg (Menu.subscriptions model.menu)
                 ]
-        _ ->
+
+        Route.Retro _ ->
             Sub.batch
                 [ Sock.listen (webSocketUrl model.flags) Socket
                 , storageGot SetId
