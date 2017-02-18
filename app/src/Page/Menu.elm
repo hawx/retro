@@ -163,15 +163,18 @@ view model =
 
 
         choice { id, name } =
-            Html.a [ Attr.class "button"
-                   , Attr.href (Route.toUrl (Route.Retro id))
-                   ]
-                [ Html.text name ]
+            Html.li []
+                [ Html.a [ Attr.href (Route.toUrl (Route.Retro id))
+                         ]
+                      [ Html.text name ]
+                ]
 
         choices =
             Html.div [ Attr.class "section" ]
                 [ Html.h2 [ Attr.class "subtitle" ] [ Html.text "Your Retros" ]
-                , Html.ul [] (List.map choice model.retroList)
+                , Html.div [ Attr.class "menu" ]
+                    [ Html.ul [ Attr.class "menu-list" ] (List.map choice model.retroList)
+                    ]
                 ]
 
         participant name =
@@ -205,8 +208,8 @@ view model =
                     ]
                 , Html.label [ Attr.class "label" ] [ Html.text "Participants" ]
                 , participants
-                , Html.div [ Attr.class "control has-addons" ] <| List.filterMap identity
-                    [ Just <| Html.p [ Attr.class "control" ]
+                , Html.div [ Attr.class "control is-grouped" ] <| List.filterMap identity
+                    [ Just <| Html.p [ Attr.class "control is-expanded" ]
                           [ Html.input [ Attr.class "input"
                                        , Event.onInput SetParticipant
                                        ] []
@@ -239,7 +242,7 @@ view model =
                   , Html.div [ Attr.class "columns" ]
                       [ Html.div [ Attr.class "column" ]
                             [ choices ]
-                      , Html.div [ Attr.class "column is-third" ]
+                      , Html.div [ Attr.class "column is-one-third" ]
                           [ Html.div [ Attr.class "box" ]
                                 [ createNew ]
                           ]
