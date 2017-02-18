@@ -1,5 +1,5 @@
-module Page.Retro exposing ( init
-                           , empty
+module Page.Retro exposing ( empty
+                           , mount
                            , Model
                            , Msg
                            , update
@@ -7,6 +7,7 @@ module Page.Retro exposing ( init
                            , view
                            )
 
+import Debug
 import Retro exposing (Retro)
 import DragAndDrop
 import Html exposing (Html)
@@ -29,15 +30,16 @@ type alias Model =
     , dnd : DragAndDrop.Model CardDragging CardOver
     }
 
-init : (Model, Cmd Msg)
-init = empty ! []
-
 empty : Model
 empty =
     { retro = Retro.empty
     , input = ""
     , dnd = DragAndDrop.empty
     }
+
+mount : Sock.Sender Msg -> String -> Cmd Msg
+mount sender retroId =
+    Sock.joinRetro sender retroId
 
 type Msg = ChangeInput String String
          | CreateCard String
@@ -49,7 +51,7 @@ type Msg = ChangeInput String String
 
 update : Sock.Sender Msg -> Msg -> Model -> (Model, Cmd Msg)
 update sender msg model =
-    case msg of
+    case Debug.log "msg" msg of
         Vote columnId cardId ->
             model ! [ Sock.vote sender columnId cardId ]
 

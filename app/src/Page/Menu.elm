@@ -1,5 +1,5 @@
 module Page.Menu exposing ( Model
-                          , init
+                          , empty
                           , mount
                           , Msg
                           , update
@@ -19,8 +19,10 @@ import Json.Decode as Decode
 import Json.Encode as Encode
 import Autocomplete
 
+type alias Retro = { id : String, name : String }
+
 type alias Model =
-    { retroList : List String
+    { retroList : List Retro
     , retroName : String
     , possibleParticipants : List String
     , participants : List String
@@ -46,29 +48,26 @@ updateConfig =
         , separateSelections = False
         }
 
-init : (Model, Cmd Msg)
-init =
+empty : Model
+empty =
     { retroList = []
     , retroName = ""
     , possibleParticipants = []
     , participants = []
     , participant = ""
     , autocompleteState = Autocomplete.empty
-    } ! []
+    }
 
 mount : Sock.Sender Msg -> Cmd Msg
 mount sender =
-    Cmd.batch
-        [ Sock.menu sender
-        ]
+    Sock.menu sender
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.map SetAutoState Autocomplete.subscription
 
 
-type Msg = GotRetros (Result Http.Error (List String))
-         | CreateRetro
+type Msg = CreateRetro
          | SetRetroName String
          | AddParticipant
          | SetParticipant String
@@ -85,14 +84,6 @@ update sender msg model =
 
         CreateRetro ->
             model ! [ Sock.createRetro sender model.retroName model.participants ]
-
-        GotRetros resp ->
-            case resp of
-                Ok retros ->
-                    { model | retroList = retros } ! []
-
-                _ ->
-                    model ! []
 
         SetParticipant input ->
             { model | participant = input } ! []
@@ -134,8 +125,8 @@ socketUpdate (id, msgData) model =
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []
 
-        Sock.Retro { id } ->
-            { model | retroList = id :: model.retroList } ! []
+        Sock.Retro { id, name } ->
+            { model | retroList = Retro id name :: model.retroList } ! []
 
         _ ->
             model ! []
@@ -171,9 +162,9 @@ view model =
                 [ Html.text "Retro" ]
 
 
-        choice name =
+        choice { id, name } =
             Html.a [ Attr.class "button"
-                   , Attr.href (Route.toUrl (Route.Retro name))
+                   , Attr.href (Route.toUrl (Route.Retro id))
                    ]
                 [ Html.text name ]
 
@@ -242,10 +233,16 @@ view model =
                 ]
 
     in
-        Bulma.modal
-            [ Bulma.box []
+        Html.section [ Attr.class "section" ]
+            [ Html.div [ Attr.class "container" ]
                   [ title
-                  , choices
-                  , createNew
+                  , Html.div [ Attr.class "columns" ]
+                      [ Html.div [ Attr.class "column" ]
+                            [ choices ]
+                      , Html.div [ Attr.class "column is-third" ]
+                          [ Html.div [ Attr.class "box" ]
+                                [ createNew ]
+                          ]
+                      ]
                   ]
             ]

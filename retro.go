@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -85,7 +84,8 @@ type userData struct {
 }
 
 type retroData struct {
-	Id string `json:"id"`
+	Id   string `json:"id"`
+	Name string `json:"name"`
 }
 
 type Room struct {
@@ -123,34 +123,28 @@ func (r *Room) AddUser(user, token string) {
 
 func (r *Room) IsUser(user, token string) bool {
 	found, err := r.db.GetUser(user)
+	log.Println(found, err)
 
 	return err == nil && found.Token == token
 }
 
 func registerHandlers(r *Room, mux *sock.Server) {
-	mux.Handle("init", func(conn *sock.Conn, data []byte) {
+	mux.Auth(func(auth sock.MsgAuth) bool {
+		return r.IsUser(auth.Username, auth.Token)
+	})
+
+	mux.Handle("joinRetro", func(conn *sock.Conn, data []byte) {
 		var args struct {
 			RetroId string
-			Name    string
-			Token   string
 		}
 		if err := json.Unmarshal(data, &args); err != nil {
-			log.Println("init:", err)
-			return
-		}
-
-		conn.Name = args.Name
-
-		if !r.IsUser(args.Name, args.Token) {
-			conn.Err = errors.New("User not recognised: " + conn.Name)
-			conn.Send("", "error", errorData{"unknown_user"})
-
+			log.Println("joinRetro:", err)
 			return
 		}
 
 		retro, err := r.db.GetRetro(args.RetroId)
 		if err != nil {
-			log.Println("init", args.RetroId, err)
+			log.Println("joinRetro", args.RetroId, err)
 			return
 		}
 		conn.RetroId = args.RetroId
@@ -195,7 +189,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 		for _, retro := range retros {
-			conn.Send("", "retro", retroData{retro.Id})
+			conn.Send("", "retro", retroData{retro.Id, retro.Name})
 		}
 	})
 
@@ -312,51 +306,54 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
+		retroId := strId()
+
 		r.db.AddRetro(database.Retro{
-			Id:    args.Name,
+			Id:    retroId,
+			Name:  args.Name,
 			Stage: "",
 		})
 
 		r.db.AddColumn(database.Column{
 			Id:    strId(),
-			Retro: args.Name,
+			Retro: retroId,
 			Name:  "Start",
 			Order: 0,
 		})
 
 		r.db.AddColumn(database.Column{
 			Id:    strId(),
-			Retro: args.Name,
+			Retro: retroId,
 			Name:  "More",
 			Order: 1,
 		})
 
 		r.db.AddColumn(database.Column{
 			Id:    strId(),
-			Retro: args.Name,
+			Retro: retroId,
 			Name:  "Keep",
 			Order: 2,
 		})
 
 		r.db.AddColumn(database.Column{
 			Id:    strId(),
-			Retro: args.Name,
+			Retro: retroId,
 			Name:  "Less",
 			Order: 3,
 		})
 
 		r.db.AddColumn(database.Column{
 			Id:    strId(),
-			Retro: args.Name,
+			Retro: retroId,
 			Name:  "Stop",
 			Order: 4,
 		})
 
 		for _, user := range args.Users {
-			r.db.AddUser(args.Name, user)
+			r.db.AddUser(retroId, user)
 		}
 
-		conn.Send(conn.Name, "retro", retroData{args.Name})
+		conn.Send(conn.Name, "retro", retroData{retroId, args.Name})
 	})
 }
 

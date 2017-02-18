@@ -1,6 +1,6 @@
 module Sock exposing ( listen
                      , update
-                     , init
+                     , joinRetro
                      , add
                      , move
                      , stage
@@ -10,6 +10,7 @@ module Sock exposing ( listen
                      , delete
                      , menu
                      , createRetro
+                     , auth
                      , MsgData(..)
                      , send
                      , Sender)
@@ -36,6 +37,7 @@ type MsgData = Error ErrorData
              | Delete VoteData
              | User UserData
              | Retro RetroData
+             | Auth AuthData
 
 type alias ErrorData = { error : String }
 
@@ -121,12 +123,19 @@ userDecoder =
     Pipeline.decode UserData
         |> Pipeline.required "username" Decode.string
 
-type alias RetroData = { id : String }
+type alias RetroData = { id : String, name : String }
 
 retroDecoder : Decode.Decoder RetroData
 retroDecoder =
     Pipeline.decode RetroData
         |> Pipeline.required "id" Decode.string
+        |> Pipeline.required "name" Decode.string
+
+type alias AuthData = ()
+
+authDecoder : Decode.Decoder AuthData
+authDecoder =
+    Decode.succeed ()
 
 
 listen : String -> (String -> msg) -> Sub msg
@@ -153,6 +162,7 @@ update data model f =
               , ("delete", runOp voteDecoder Delete)
               , ("user", runOp userDecoder User)
               , ("retro", runOp retroDecoder Retro)
+              , ("auth", runOp authDecoder Auth)
               ]
 
         runMux { id, op, data } model =
@@ -167,17 +177,15 @@ update data model f =
 
 type alias Sender msg = String -> Encode.Value -> Cmd msg
 
-send : String -> String -> Sender msg
-send url id =
-    Sock.LowLevel.send url id
+send : String -> String -> String -> Sender msg
+send url id token =
+    Sock.LowLevel.send url id token
 
-init : Sender msg -> String -> String -> String -> Cmd msg
-init sender retroId name token =
-    sender "init" <|
+joinRetro : Sender msg -> String -> Cmd msg
+joinRetro sender retroId =
+    sender "joinRetro" <|
         Encode.object
             [ ("retroId", Encode.string retroId)
-            , ("name", Encode.string name)
-            , ("token", Encode.string token)
             ]
 
 add : Sender msg -> String -> String -> Cmd msg
@@ -249,4 +257,12 @@ createRetro sender name users =
         Encode.object
             [ ("name", Encode.string name)
             , ("users", Encode.list (List.map Encode.string users))
+            ]
+
+auth : Sender msg -> String -> String -> Cmd msg
+auth sender username token =
+    sender "auth" <|
+        Encode.object
+            [ ("username", Encode.string username)
+            , ("token", Encode.string token)
             ]

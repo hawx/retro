@@ -1,12 +1,21 @@
 package sock
 
-import "golang.org/x/net/websocket"
+import (
+	"errors"
+	"log"
+
+	"golang.org/x/net/websocket"
+)
 
 type Handler func(conn *Conn, data []byte)
+
+type Authenticator func(MsgAuth) bool
 
 type mux struct {
 	// I'm trusting you not to insert handlers once Serve is called...
 	handlers map[string]Handler
+
+	authenticate Authenticator
 }
 
 func newMux() *mux {
@@ -26,13 +35,18 @@ func (m *mux) serve(conn *Conn) error {
 			return err
 		}
 
+		log.Println(msg, msg.Auth == nil)
+
+		if msg.Auth == nil || !m.authenticate(*msg.Auth) {
+			conn.Send("", "error", errorData{"bad_auth"})
+			return errors.New("BadAuth")
+		}
+
+		conn.Name = msg.Auth.Username
+
 		handler, ok := m.handlers[msg.Op]
 		if !ok {
 			continue
-		}
-
-		if conn.Name == "" {
-			conn.Name = msg.Id
 		}
 
 		handler(conn, []byte(msg.Data))
@@ -40,4 +54,8 @@ func (m *mux) serve(conn *Conn) error {
 			return conn.Err
 		}
 	}
+}
+
+type errorData struct {
+	Error string `json:"error"`
 }
