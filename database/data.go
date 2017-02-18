@@ -33,6 +33,14 @@ func (d *Database) setup() error {
       Stage     TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS retro_users (
+      Retro     TEXT,
+      Username  TEXT,
+      PRIMARY KEY(Username, Retro),
+      FOREIGN KEY(Retro) REFERENCES retros(Id),
+      FOREIGN KEY(Username) REFERENCES users(Username)
+    );
+
     CREATE TABLE IF NOT EXISTS columns (
       Id        TEXT PRIMARY KEY,
       Retro     TEXT,

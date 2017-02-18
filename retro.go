@@ -410,51 +410,59 @@ func (room *Room) listRetros(w http.ResponseWriter, r *http.Request) {
 }
 
 func (room *Room) createRetro(w http.ResponseWriter, r *http.Request) {
-	var retroId string
-	if err := json.NewDecoder(r.Body).Decode(&retroId); err != nil {
+	var createRetro struct {
+		Name  string   `json:"name"`
+		Users []string `json:"users"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&createRetro); err != nil {
 		log.Println(err)
 		return
 	}
 
 	room.db.AddRetro(database.Retro{
-		Id:    retroId,
+		Id:    createRetro.Name,
 		Stage: "",
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
-		Retro: retroId,
+		Retro: createRetro.Name,
 		Name:  "Start",
 		Order: 0,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
-		Retro: retroId,
+		Retro: createRetro.Name,
 		Name:  "More",
 		Order: 1,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
-		Retro: retroId,
+		Retro: createRetro.Name,
 		Name:  "Keep",
 		Order: 2,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
-		Retro: retroId,
+		Retro: createRetro.Name,
 		Name:  "Less",
 		Order: 3,
 	})
 
 	room.db.AddColumn(database.Column{
 		Id:    strId(),
-		Retro: retroId,
+		Retro: createRetro.Name,
 		Name:  "Stop",
 		Order: 4,
 	})
+
+	for _, user := range createRetro.Users {
+		room.db.AddUser(createRetro.Name, user)
+	}
 
 	var list []string
 	retros, _ := room.db.GetRetros()
