@@ -360,11 +360,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			Order: 4,
 		})
 
+		r.db.AddUser(retroId, conn.Name)
+
 		for _, user := range args.Users {
 			r.db.AddUser(retroId, user)
 		}
 
-		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, args.Users})
+		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, append(args.Users, conn.Name)})
 	})
 }
 

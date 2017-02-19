@@ -219,7 +219,7 @@ view model =
             case model.user of
                 Just userId ->
                     Html.div []
-                        [ Html.map MenuMsg (Menu.view model.menu)
+                        [ Html.map MenuMsg (Menu.view userId model.menu)
                         , footer
                         ]
 

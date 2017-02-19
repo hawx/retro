@@ -21,11 +21,12 @@ import Autocomplete
 import Date exposing (Date)
 import Date.Format
 
-type alias Retro = { id : String
-                   , name : String
-                   , createdAt : Date
-                   , participants : List String
-                   }
+type alias Retro =
+    { id : String
+    , name : String
+    , createdAt : Date
+    , participants : List String
+    }
 
 type alias Model =
     { retroList : List Retro
@@ -120,7 +121,7 @@ update sender msg model =
                         autoMsg
                         5
                         model.autocompleteState
-                        (acceptablePeople model)
+                        (acceptablePeople "" model)
 
                 newModel =
                     { model | autocompleteState = newState }
@@ -149,10 +150,11 @@ socketUpdate (id, msgData) model =
         _ ->
             model ! []
 
-acceptablePeople : Model -> List String
-acceptablePeople { participant, participants, possibleParticipants } =
+acceptablePeople : String -> Model -> List String
+acceptablePeople currentUser { participant, participants, possibleParticipants } =
     possibleParticipants
         |> List.filter (\x -> not (List.member x participants))
+        |> List.filter ((/=) currentUser)
         |> List.filter (String.contains (String.toLower participant) << String.toLower)
 
 viewConfig : Autocomplete.ViewConfig String
@@ -172,8 +174,8 @@ viewConfig =
             , li = customizedLi
             }
 
-view : Model -> Html Msg
-view model =
+view : String -> Model -> Html Msg
+view currentUser model =
     let
         title =
             Html.section [ Attr.class "hero is-dark is-bold" ]
@@ -218,6 +220,10 @@ view model =
                     ]
                 ]
 
+        currentUserParticipant =
+            Html.span [ Attr.class "tag is-medium" ]
+                [ Html.text currentUser ]
+
         participant name =
             Html.span [ Attr.class "tag is-medium" ]
                 [ Html.text name
@@ -227,7 +233,7 @@ view model =
 
         participants =
             Html.div [ Attr.class "control" ]
-                (List.map participant model.participants)
+                (currentUserParticipant :: List.map participant model.participants)
 
         autocomplete =
             Html.map SetAutoState
@@ -235,7 +241,7 @@ view model =
                      viewConfig
                      5
                      model.autocompleteState
-                     (acceptablePeople model))
+                     (acceptablePeople currentUser model))
 
         createNew =
             Html.div []
@@ -254,7 +260,7 @@ view model =
                                        , Event.onInput SetParticipant
                                        ] []
                           ]
-                    , if model.participant == "" || acceptablePeople model == [] then
+                    , if model.participant == "" || acceptablePeople currentUser model == [] then
                           Nothing
                       else
                           Just autocomplete
