@@ -23,7 +23,9 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Dict
+import Date exposing (Date)
 import Sock.LowLevel
+
 
 type MsgData = Error ErrorData
              | Stage StageData
@@ -123,13 +125,15 @@ userDecoder =
     Pipeline.decode UserData
         |> Pipeline.required "username" Decode.string
 
-type alias RetroData = { id : String, name : String }
+type alias RetroData = { id : String, name : String, createdAt : Date, participants : List String }
 
 retroDecoder : Decode.Decoder RetroData
 retroDecoder =
     Pipeline.decode RetroData
         |> Pipeline.required "id" Decode.string
         |> Pipeline.required "name" Decode.string
+        |> Pipeline.required "createdAt" decodeDate
+        |> Pipeline.required "participants" (Decode.list Decode.string)
 
 type alias AuthData = ()
 
@@ -266,3 +270,20 @@ auth sender username token =
             [ ("username", Encode.string username)
             , ("token", Encode.string token)
             ]
+
+
+
+
+
+decodeDate : Decode.Decoder Date
+decodeDate =
+    let
+        run x =
+            case x of
+                Ok date ->
+                    Decode.succeed date
+
+                Err err ->
+                    Decode.fail err
+    in
+        Decode.string |> Decode.map Date.fromString |> Decode.andThen run

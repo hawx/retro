@@ -11,6 +11,10 @@ modal body =
         , Html.button [ Attr.class "modal-close" ] []
         ]
 
+tag : String -> Html msg
+tag text =
+    Html.span [ Attr.class "tag" ] [ Html.text text ]
+
 tabs : List (Html.Attribute msg) -> List (Html msg) -> Html msg
 tabs attrs =
     Html.div (Attr.class "tabs" :: attrs)

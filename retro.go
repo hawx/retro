@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -84,8 +85,10 @@ type userData struct {
 }
 
 type retroData struct {
-	Id   string `json:"id"`
-	Name string `json:"name"`
+	Id           string    `json:"id"`
+	Name         string    `json:"name"`
+	CreatedAt    time.Time `json:"createdAt"`
+	Participants []string  `json:"participants"`
 }
 
 type Room struct {
@@ -189,7 +192,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 		for _, retro := range retros {
-			conn.Send("", "retro", retroData{retro.Id, retro.Name})
+			conn.Send("", "retro", retroData{retro.Id, retro.Name, retro.CreatedAt, []string{}})
 		}
 	})
 
@@ -307,11 +310,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		}
 
 		retroId := strId()
+		createdAt := time.Now()
 
 		r.db.AddRetro(database.Retro{
-			Id:    retroId,
-			Name:  args.Name,
-			Stage: "",
+			Id:        retroId,
+			Name:      args.Name,
+			Stage:     "",
+			CreatedAt: createdAt,
 		})
 
 		r.db.AddColumn(database.Column{
@@ -353,7 +358,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			r.db.AddUser(retroId, user)
 		}
 
-		conn.Send(conn.Name, "retro", retroData{retroId, args.Name})
+		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, []string{}})
 	})
 }
 

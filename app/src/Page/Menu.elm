@@ -18,8 +18,14 @@ import Route
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Autocomplete
+import Date exposing (Date)
+import Date.Format
 
-type alias Retro = { id : String, name : String }
+type alias Retro = { id : String
+                   , name : String
+                   , createdAt : Date
+                   , participants : List String
+                   }
 
 type alias Model =
     { retroList : List Retro
@@ -28,6 +34,7 @@ type alias Model =
     , participants : List String
     , participant : String
     , autocompleteState : Autocomplete.State
+    , currentChoice : Maybe Retro
     }
 
 updateConfig : Autocomplete.UpdateConfig Msg String
@@ -56,6 +63,7 @@ empty =
     , participants = []
     , participant = ""
     , autocompleteState = Autocomplete.empty
+    , currentChoice = Nothing
     }
 
 mount : Sock.Sender Msg -> Cmd Msg
@@ -74,6 +82,7 @@ type Msg = CreateRetro
          | DeleteParticipant String
          | SetAutoState Autocomplete.Msg
          | SelectParticipant String
+         | ShowRetroDetails String
 
 
 update : Sock.Sender Msg -> Msg -> Model -> (Model, Cmd Msg)
@@ -100,6 +109,9 @@ update sender msg model =
         SelectParticipant name ->
             { model | participants = name :: model.participants } ! []
 
+        ShowRetroDetails retroId ->
+            { model | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList } ! []
+
         SetAutoState autoMsg ->
             let
                 (newState, maybeMsg) =
@@ -125,8 +137,15 @@ socketUpdate (id, msgData) model =
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []
 
-        Sock.Retro { id, name } ->
-            { model | retroList = Retro id name :: model.retroList } ! []
+        Sock.Retro { id, name, createdAt, participants } ->
+            let
+                newRetro = Retro id name createdAt participants
+                currentRetro = model.currentChoice |> Maybe.withDefault newRetro
+            in
+                { model
+                    | retroList = newRetro :: model.retroList
+                    , currentChoice = Just currentRetro
+                } ! []
 
         _ ->
             model ! []
@@ -158,22 +177,45 @@ view : Model -> Html Msg
 view model =
     let
         title =
-            Html.h1 [ Attr.class "title" ]
-                [ Html.text "Retro" ]
+            Html.section [ Attr.class "hero is-dark is-bold" ]
+                [ Html.div [ Attr.class "hero-body" ]
+                      [ Html.div [ Attr.class "container" ]
+                            [ Html.h1 [ Attr.class "title" ]
+                                  [ Html.text "Retro" ]
+                            ]
+                      ]
+                ]
 
 
-        choice { id, name } =
+        choice current { id, name } =
             Html.li []
-                [ Html.a [ Attr.href (Route.toUrl (Route.Retro id))
+                [ Html.a [ Event.onClick (ShowRetroDetails id)
+                         , Attr.classList [ ("is-active", Just id == Maybe.map .id current) ]
                          ]
                       [ Html.text name ]
                 ]
 
-        choices =
-            Html.div [ Attr.class "section" ]
-                [ Html.h2 [ Attr.class "subtitle" ] [ Html.text "Your Retros" ]
+        choices current =
+            Html.div []
+                [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Your Retros" ]
                 , Html.div [ Attr.class "menu" ]
-                    [ Html.ul [ Attr.class "menu-list" ] (List.map choice model.retroList)
+                    [ Html.ul [ Attr.class "menu-list" ] (List.map (choice current) model.retroList)
+                    ]
+                ]
+
+        formatDate date =
+            Date.Format.format "%d %B, %Y at %I:%M%P" date
+
+        currentChoice retro =
+            Html.div []
+                [ Html.h2 [ Attr.class "title is-4" ] [ Html.text retro.name ]
+                , Html.h3 [ Attr.class "subtitle is-6" ] [ Html.text (formatDate retro.createdAt) ]
+                , Html.div [ Attr.class "control" ] <| List.map Bulma.tag retro.participants
+                , Html.div [ Attr.class "control" ]
+                    [ Html.a [ Attr.class "button is-primary"
+                             , Attr.href (Route.toUrl (Route.Retro retro.id))
+                             ]
+                          [ Html.text "Open" ]
                     ]
                 ]
 
@@ -196,10 +238,9 @@ view model =
                      model.autocompleteState
                      (acceptablePeople model))
 
-
         createNew =
-            Html.div [ Attr.class "section" ]
-                [ Html.h2 [ Attr.class "subtitle" ] [ Html.text "Create New" ]
+            Html.div []
+                [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
                 , Html.label [ Attr.class "label" ] [ Html.text "Name" ]
                 , Html.p [ Attr.class "control" ]
                     [ Html.input [ Event.onInput SetRetroName
@@ -236,16 +277,26 @@ view model =
                 ]
 
     in
-        Html.section [ Attr.class "section" ]
-            [ Html.div [ Attr.class "container" ]
-                  [ title
-                  , Html.div [ Attr.class "columns" ]
-                      [ Html.div [ Attr.class "column" ]
-                            [ choices ]
-                      , Html.div [ Attr.class "column is-one-third" ]
-                          [ Html.div [ Attr.class "box" ]
-                                [ createNew ]
+        Html.div []
+            [ title
+            , Html.section [ Attr.class "section" ]
+                [ Html.div [ Attr.class "container" ]
+                      [ Html.div [ Attr.class "columns" ]
+                          [ Html.div [ Attr.class "column is-one-third" ]
+                                [ choices model.currentChoice ]
+                          , Html.div [ Attr.class "column is-one-third" ] <|
+                              case model.currentChoice of
+                                  Just retro ->
+                                      [ currentChoice retro ]
+
+                                  Nothing ->
+                                      []
+
+                          , Html.div [ Attr.class "column is-one-third" ]
+                              [ Html.div [ Attr.class "box" ]
+                                    [ createNew ]
+                              ]
                           ]
                       ]
-                  ]
+                ]
             ]
