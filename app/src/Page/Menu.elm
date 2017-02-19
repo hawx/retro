@@ -140,11 +140,10 @@ socketUpdate (id, msgData) model =
         Sock.Retro { id, name, createdAt, participants } ->
             let
                 newRetro = Retro id name createdAt participants
-                currentRetro = model.currentChoice |> Maybe.withDefault newRetro
             in
                 { model
                     | retroList = newRetro :: model.retroList
-                    , currentChoice = Just currentRetro
+                    , currentChoice = Just newRetro
                 } ! []
 
         _ ->

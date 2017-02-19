@@ -192,7 +192,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 		for _, retro := range retros {
-			conn.Send("", "retro", retroData{retro.Id, retro.Name, retro.CreatedAt, []string{}})
+			participants, err := r.db.GetParticipants(retro.Id)
+			if err != nil {
+				log.Println("retros.participants", err)
+				continue
+			}
+
+			conn.Send("", "retro", retroData{retro.Id, retro.Name, retro.CreatedAt, participants})
 		}
 	})
 
@@ -358,7 +364,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			r.db.AddUser(retroId, user)
 		}
 
-		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, []string{}})
+		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, args.Users})
 	})
 }
 

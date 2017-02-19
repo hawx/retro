@@ -7,3 +7,22 @@ func (d *Database) AddUser(retroId, username string) error {
 
 	return err
 }
+
+func (d *Database) GetParticipants(retroId string) (participants []string, err error) {
+	rows, err := d.db.Query("SELECT Username FROM retro_users WHERE Retro = ?",
+		retroId)
+	if err != nil {
+		return participants, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var participant string
+		if err = rows.Scan(&participant); err != nil {
+			return participants, err
+		}
+		participants = append(participants, participant)
+	}
+
+	return participants, rows.Err()
+}
