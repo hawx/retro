@@ -1,7 +1,7 @@
 package database
 
-func (d *Database) AddUser(retroId, username string) error {
-	_, err := d.db.Exec("INSERT INTO retro_users(Retro, Username) VALUES (?, ?)",
+func (d *Database) AddParticipant(retroId, username string) error {
+	_, err := d.db.Exec("INSERT INTO participants(Retro, Username) VALUES (?, ?)",
 		retroId,
 		username)
 
@@ -9,7 +9,7 @@ func (d *Database) AddUser(retroId, username string) error {
 }
 
 func (d *Database) GetParticipants(retroId string) (participants []string, err error) {
-	rows, err := d.db.Query("SELECT Username FROM retro_users WHERE Retro = ?",
+	rows, err := d.db.Query("SELECT Username FROM participants WHERE Retro = ?",
 		retroId)
 	if err != nil {
 		return participants, err

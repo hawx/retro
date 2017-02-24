@@ -7,7 +7,6 @@ module Page.Retro exposing ( empty
                            , view
                            )
 
-import Debug
 import Retro exposing (Retro)
 import DragAndDrop
 import Html exposing (Html)
@@ -37,8 +36,8 @@ empty =
     , dnd = DragAndDrop.empty
     }
 
-mount : Sock.Sender Msg -> String -> Cmd Msg
-mount sender retroId =
+mount : String -> Sock.Sender Msg -> Cmd Msg
+mount retroId sender =
     Sock.joinRetro sender retroId
 
 type Msg = ChangeInput String String
@@ -51,7 +50,7 @@ type Msg = ChangeInput String String
 
 update : Sock.Sender Msg -> Msg -> Model -> (Model, Cmd Msg)
 update sender msg model =
-    case Debug.log "msg" msg of
+    case msg of
         Vote columnId cardId ->
             model ! [ Sock.vote sender columnId cardId ]
 
@@ -167,7 +166,7 @@ socketUpdate (id, msgData) model =
 
 view : String -> Model -> Html Msg
 view userId model =
-    Html.section [ Attr.class "section" ]
+    Bulma.section
         [ Html.div [ Attr.class "container is-fluid" ]
               [ tabsView model.retro.stage
               , columnsView userId model.retro.stage model.dnd model.retro.columns

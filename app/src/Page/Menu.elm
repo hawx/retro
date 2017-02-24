@@ -5,9 +5,8 @@ module Page.Menu exposing ( Model
                           , update
                           , socketUpdate
                           , view
-                          , subscriptions)
+                          )
 
-import Debug
 import Sock
 import Http
 import Html exposing (Html)
@@ -17,7 +16,6 @@ import Bulma
 import Route
 import Json.Decode as Decode
 import Json.Encode as Encode
-import Autocomplete
 import Date exposing (Date)
 import Date.Format
 
@@ -34,27 +32,8 @@ type alias Model =
     , possibleParticipants : List String
     , participants : List String
     , participant : String
-    , autocompleteState : Autocomplete.State
     , currentChoice : Maybe Retro
     }
-
-updateConfig : Autocomplete.UpdateConfig Msg String
-updateConfig =
-    Autocomplete.updateConfig
-        { toId = identity
-        , onKeyDown =
-              \code maybeId ->
-                  if code == 13 then
-                      Maybe.map SelectParticipant maybeId
-                  else
-                      Nothing
-        , onTooLow = Nothing
-        , onTooHigh = Nothing
-        , onMouseEnter = \_ -> Nothing
-        , onMouseLeave = \_ -> Nothing
-        , onMouseClick = \id -> Just <| SelectParticipant id
-        , separateSelections = False
-        }
 
 empty : Model
 empty =
@@ -63,7 +42,6 @@ empty =
     , possibleParticipants = []
     , participants = []
     , participant = ""
-    , autocompleteState = Autocomplete.empty
     , currentChoice = Nothing
     }
 
@@ -71,17 +49,12 @@ mount : Sock.Sender Msg -> Cmd Msg
 mount sender =
     Sock.menu sender
 
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.map SetAutoState Autocomplete.subscription
-
 
 type Msg = CreateRetro
          | SetRetroName String
          | AddParticipant
          | SetParticipant String
          | DeleteParticipant String
-         | SetAutoState Autocomplete.Msg
          | SelectParticipant String
          | ShowRetroDetails String
 
@@ -113,24 +86,6 @@ update sender msg model =
         ShowRetroDetails retroId ->
             { model | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList } ! []
 
-        SetAutoState autoMsg ->
-            let
-                (newState, maybeMsg) =
-                    Autocomplete.update
-                        updateConfig
-                        autoMsg
-                        5
-                        model.autocompleteState
-                        (acceptablePeople "" model)
-
-                newModel =
-                    { model | autocompleteState = newState }
-            in
-                case maybeMsg of
-                    Just newMsg ->
-                        update sender newMsg newModel
-                    Nothing ->
-                        newModel ! []
 
 socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
 socketUpdate (id, msgData) model =
@@ -150,6 +105,7 @@ socketUpdate (id, msgData) model =
         _ ->
             model ! []
 
+
 acceptablePeople : String -> Model -> List String
 acceptablePeople currentUser { participant, participants, possibleParticipants } =
     possibleParticipants
@@ -157,22 +113,6 @@ acceptablePeople currentUser { participant, participants, possibleParticipants }
         |> List.filter ((/=) currentUser)
         |> List.filter (String.contains (String.toLower participant) << String.toLower)
 
-viewConfig : Autocomplete.ViewConfig String
-viewConfig =
-    let
-        customizedLi keySelected mouseSelected person =
-            { attributes = [ Attr.classList [ ("autocomplete-item", True)
-                                            , ("is-selected", keySelected || mouseSelected)
-                                            ]
-                           ]
-            , children = [ Html.text person ]
-            }
-    in
-        Autocomplete.viewConfig
-            { toId = identity
-            , ul = [ Attr.class "autocomplete-list" ]
-            , li = customizedLi
-            }
 
 view : String -> Model -> Html Msg
 view currentUser model =
@@ -180,10 +120,8 @@ view currentUser model =
         title =
             Html.section [ Attr.class "hero is-dark is-bold" ]
                 [ Html.div [ Attr.class "hero-body" ]
-                      [ Html.div [ Attr.class "container" ]
-                            [ Html.h1 [ Attr.class "title" ]
-                                  [ Html.text "Retro" ]
-                            ]
+                      [ Bulma.container
+                            [ Bulma.title "Retro" ]
                       ]
                 ]
 
@@ -235,24 +173,26 @@ view currentUser model =
             Html.div [ Attr.class "control" ]
                 (currentUserParticipant :: List.map participant model.participants)
 
-        autocomplete =
-            Html.map SetAutoState
-                (Autocomplete.view
-                     viewConfig
-                     5
-                     model.autocompleteState
-                     (acceptablePeople currentUser model))
+        participantSuggestions =
+            let
+                matching = acceptablePeople currentUser model
+
+                item name =
+                    Html.li []
+                        [ Html.a [ Event.onClick (SelectParticipant name) ]
+                              [ Html.text name ]
+                        ]
+            in
+                List.map item matching
+                    |> Html.ul [ Attr.class "autocomplete-list" ]
+
 
         createNew =
             Html.div []
                 [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
-                , Html.label [ Attr.class "label" ] [ Html.text "Name" ]
-                , Html.p [ Attr.class "control" ]
-                    [ Html.input [ Event.onInput SetRetroName
-                                 , Attr.class "input"
-                                 ] []
-                    ]
-                , Html.label [ Attr.class "label" ] [ Html.text "Participants" ]
+                , Bulma.label "Name"
+                , Bulma.input [ Event.onInput SetRetroName ]
+                , Bulma.label "Participants"
                 , participants
                 , Html.div [ Attr.class "control is-grouped" ] <| List.filterMap identity
                     [ Just <| Html.p [ Attr.class "control is-expanded" ]
@@ -263,10 +203,10 @@ view currentUser model =
                     , if model.participant == "" || acceptablePeople currentUser model == [] then
                           Nothing
                       else
-                          Just autocomplete
+                          Just participantSuggestions
                     , Just <| Html.button [ Attr.class "button is-info"
-                                  , Event.onClick AddParticipant
-                                  ]
+                                          , Event.onClick AddParticipant
+                                          ]
                         [ Html.text "Add" ]
                     ]
                 , Html.div [ Attr.class "level" ]
@@ -284,12 +224,12 @@ view currentUser model =
     in
         Html.div []
             [ title
-            , Html.section [ Attr.class "section" ]
-                [ Html.div [ Attr.class "container" ]
-                      [ Html.div [ Attr.class "columns" ]
-                          [ Html.div [ Attr.class "column is-one-third" ]
+            , Bulma.section
+                [ Bulma.container
+                      [ Bulma.columns []
+                          [ Bulma.column []
                                 [ choices model.currentChoice ]
-                          , Html.div [ Attr.class "column is-one-third" ] <|
+                          , Bulma.column [] <|
                               case model.currentChoice of
                                   Just retro ->
                                       [ currentChoice retro ]
@@ -297,8 +237,8 @@ view currentUser model =
                                   Nothing ->
                                       []
 
-                          , Html.div [ Attr.class "column is-one-third" ]
-                              [ Html.div [ Attr.class "box" ]
+                          , Bulma.column []
+                              [ Bulma.box []
                                     [ createNew ]
                               ]
                           ]

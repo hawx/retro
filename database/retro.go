@@ -33,9 +33,9 @@ func (d *Database) GetRetros(username string) (retros []Retro, err error) {
 	rows, err := d.db.Query(`
     SELECT retros.Id, retros.Name, retros.Stage, retros.CreatedAt
     FROM retros
-    INNER JOIN retro_users
-      ON retros.Id = retro_users.Retro
-    WHERE retro_users.Username = ?
+    INNER JOIN participants
+      ON retros.Id = participants.Retro
+    WHERE participants.Username = ?
     ORDER BY retros.CreatedAt`,
 		username)
 	if err != nil {

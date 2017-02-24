@@ -2,7 +2,6 @@ package sock
 
 import (
 	"errors"
-	"log"
 
 	"golang.org/x/net/websocket"
 )
@@ -34,8 +33,6 @@ func (m *mux) serve(conn *Conn) error {
 		if err := websocket.JSON.Receive(conn.ws, &msg); err != nil {
 			return err
 		}
-
-		log.Println(msg, msg.Auth == nil)
 
 		if msg.Auth == nil || !m.authenticate(*msg.Auth) {
 			conn.Send("", "error", errorData{"bad_auth"})

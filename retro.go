@@ -126,7 +126,6 @@ func (r *Room) AddUser(user, token string) {
 
 func (r *Room) IsUser(user, token string) bool {
 	found, err := r.db.GetUser(user)
-	log.Println(found, err)
 
 	return err == nil && found.Token == token
 }
@@ -360,13 +359,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			Order: 4,
 		})
 
-		r.db.AddUser(retroId, conn.Name)
+		allParticipants := append(args.Users, conn.Name)
 
-		for _, user := range args.Users {
-			r.db.AddUser(retroId, user)
+		for _, user := range allParticipants {
+			r.db.AddParticipant(retroId, user)
 		}
 
-		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, append(args.Users, conn.Name)})
+		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, allParticipants})
 	})
 }
 

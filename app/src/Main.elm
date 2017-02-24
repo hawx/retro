@@ -80,7 +80,7 @@ sockSender flags userId token =
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-    case Debug.log "update" msg of
+    case msg of
         MenuMsg subMsg ->
             case Maybe.map2 (,) model.user model.token of
                 Just (userId, token) ->
@@ -155,33 +155,21 @@ routeChange route model =
                 | route = route
                 , retro = Retro.empty
                 , menu = Menu.empty
-            } ! [ Cmd.map MenuMsg
-                      (authenticatedCmd model
-                           (\userId token ->
-                                Menu.mount (sockSender model.flags userId token)
-                           )
-                      )
-                ]
+            } ! [ Cmd.map MenuMsg (runWithSockSender model Menu.mount) ]
 
         Route.Retro retroId ->
             { model
                 | route = route
                 , retro = Retro.empty
                 , menu = Menu.empty
-            } ! [ Cmd.map RetroMsg
-                      (authenticatedCmd model
-                           (\userId token ->
-                                Retro.mount (sockSender model.flags userId token) retroId
-                           )
-                      )
-                ]
+            } ! [ Cmd.map RetroMsg (runWithSockSender model (Retro.mount retroId)) ]
 
 
-authenticatedCmd : Model -> (String -> String -> Cmd msg) -> Cmd msg
-authenticatedCmd model cmd =
+runWithSockSender : Model -> (Sock.Sender msg -> Cmd msg) -> Cmd msg
+runWithSockSender model f =
     case Maybe.map2 (,) model.user model.token of
         Just (userId, token) ->
-            cmd userId token
+            f (sockSender model.flags userId token)
 
         Nothing ->
             Cmd.none
@@ -189,9 +177,6 @@ authenticatedCmd model cmd =
 socketUpdate : (String, Sock.MsgData) -> Model -> (Model, Cmd Msg)
 socketUpdate (id, msgData) model =
     case msgData of
-        Sock.Auth _ ->
-            routeChange model.route model
-
         Sock.Error { error } ->
             handleError error model
 
@@ -214,30 +199,27 @@ handleError error model =
 
 view : Model -> Html Msg
 view model =
+    case model.user of
+        Just userId ->
+            Html.div []
+                [ innerView userId model
+                , footer
+                ]
+
+        Nothing ->
+            Html.div []
+                [ signInModal
+                , footer]
+
+innerView : String -> Model -> Html Msg
+innerView userId model =
     case model.route of
         Route.Menu ->
-            case model.user of
-                Just userId ->
-                    Html.div []
-                        [ Html.map MenuMsg (Menu.view userId model.menu)
-                        , footer
-                        ]
-
-                Nothing ->
-                    Html.div []
-                        [ signInModal ]
+            Html.map MenuMsg (Menu.view userId model.menu)
 
         Route.Retro retroId ->
-            case model.user of
-                Just userId ->
-                    Html.div []
-                        [ Html.map RetroMsg (Retro.view userId model.retro)
-                        , footer
-                        ]
+            Html.map RetroMsg (Retro.view userId model.retro)
 
-                Nothing ->
-                    Html.div []
-                        [ signInModal ]
 
 signInModal : Html msg
 signInModal =
@@ -266,16 +248,7 @@ footer =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model.route of
-        Route.Menu ->
-            Sub.batch
-                [ Sock.listen (webSocketUrl model.flags) Socket
-                , storageGot SetId
-                , Sub.map MenuMsg (Menu.subscriptions model.menu)
-                ]
-
-        Route.Retro _ ->
-            Sub.batch
-                [ Sock.listen (webSocketUrl model.flags) Socket
-                , storageGot SetId
-                ]
+    Sub.batch
+        [ Sock.listen (webSocketUrl model.flags) Socket
+        , storageGot SetId
+        ]

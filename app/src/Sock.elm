@@ -10,7 +10,6 @@ module Sock exposing ( listen
                      , delete
                      , menu
                      , createRetro
-                     , auth
                      , MsgData(..)
                      , send
                      , Sender)
@@ -39,7 +38,6 @@ type MsgData = Error ErrorData
              | Delete VoteData
              | User UserData
              | Retro RetroData
-             | Auth AuthData
 
 type alias ErrorData = { error : String }
 
@@ -135,12 +133,6 @@ retroDecoder =
         |> Pipeline.required "createdAt" decodeDate
         |> Pipeline.required "participants" (Decode.list Decode.string)
 
-type alias AuthData = ()
-
-authDecoder : Decode.Decoder AuthData
-authDecoder =
-    Decode.succeed ()
-
 
 listen : String -> (String -> msg) -> Sub msg
 listen = Sock.LowLevel.listen
@@ -166,7 +158,6 @@ update data model f =
               , ("delete", runOp voteDecoder Delete)
               , ("user", runOp userDecoder User)
               , ("retro", runOp retroDecoder Retro)
-              , ("auth", runOp authDecoder Auth)
               ]
 
         runMux { id, op, data } model =
@@ -262,18 +253,6 @@ createRetro sender name users =
             [ ("name", Encode.string name)
             , ("users", Encode.list (List.map Encode.string users))
             ]
-
-auth : Sender msg -> String -> String -> Cmd msg
-auth sender username token =
-    sender "auth" <|
-        Encode.object
-            [ ("username", Encode.string username)
-            , ("token", Encode.string token)
-            ]
-
-
-
-
 
 decodeDate : Decode.Decoder Date
 decodeDate =

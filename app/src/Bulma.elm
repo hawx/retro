@@ -70,3 +70,16 @@ input attrs =
 delete : List (Html.Attribute msg) -> Html msg
 delete attrs =
     Html.button (Attr.class "delete" :: attrs) []
+
+container : List (Html msg) -> Html msg
+container =
+    Html.div [ Attr.class "container" ]
+
+title : String -> Html msg
+title text =
+    Html.h1 [ Attr.class "title" ] [ Html.text text ]
+
+
+section : List (Html msg) -> Html msg
+section =
+    Html.section [ Attr.class "section" ]

@@ -35,7 +35,7 @@ func (d *Database) setup() error {
       CreatedAt DATETIME
     );
 
-    CREATE TABLE IF NOT EXISTS retro_users (
+    CREATE TABLE IF NOT EXISTS participants (
       Retro     TEXT,
       Username  TEXT,
       PRIMARY KEY(Username, Retro),
