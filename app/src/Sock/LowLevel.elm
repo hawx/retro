@@ -18,6 +18,13 @@ type alias SocketMsg =
     , data : String
     }
 
+type alias AuthenticatedMsg =
+    { id : String
+    , op : String
+    , data : String
+    , username : String
+    , token : String }
+
 socketMsgDecoder : Decode.Decoder SocketMsg
 socketMsgDecoder =
     Pipeline.decode SocketMsg
@@ -33,12 +40,27 @@ socketMsgEncoder value =
         , ("data", Encode.string value.data)
         ]
 
-send : String -> String -> String -> Encode.Value -> Cmd msg
-send url id op data =
-    SocketMsg id op (Encode.encode 0 data)
-        |> socketMsgEncoder
+authenticatedMsgEncoder : AuthenticatedMsg -> Encode.Value
+authenticatedMsgEncoder value =
+    Encode.object
+        [ ("id", Encode.string value.id)
+        , ("auth", Encode.object
+               [ ("username", Encode.string value.username)
+               , ("token", Encode.string value.token)
+               ]
+          )
+        , ("op", Encode.string value.op)
+        , ("data", Encode.string value.data)
+        ]
+
+
+send : String -> String -> String -> String -> Encode.Value -> Cmd msg
+send url id token op data =
+    AuthenticatedMsg id op (Encode.encode 0 data) id token
+        |> authenticatedMsgEncoder
         |> Encode.encode 0
         |> WebSocket.send url
+
 
 listen : String -> (String -> msg) -> Sub msg
 listen url tagger =

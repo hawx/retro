@@ -1,6 +1,6 @@
 module Sock exposing ( listen
                      , update
-                     , init
+                     , joinRetro
                      , add
                      , move
                      , stage
@@ -8,7 +8,11 @@ module Sock exposing ( listen
                      , group
                      , vote
                      , delete
-                     , MsgData(..))
+                     , menu
+                     , createRetro
+                     , MsgData(..)
+                     , send
+                     , Sender)
 
 {-| This module provides a domain wrapper on top of the websocket format for the
 purposes of retro.
@@ -18,7 +22,9 @@ import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
 import Dict
+import Date exposing (Date)
 import Sock.LowLevel
+
 
 type MsgData = Error ErrorData
              | Stage StageData
@@ -30,6 +36,8 @@ type MsgData = Error ErrorData
              | Group GroupData
              | Vote VoteData
              | Delete VoteData
+             | User UserData
+             | Retro RetroData
 
 type alias ErrorData = { error : String }
 
@@ -108,6 +116,24 @@ voteDecoder =
         |> Pipeline.required "columnId" Decode.string
         |> Pipeline.required "cardId" Decode.string
 
+type alias UserData = { username : String }
+
+userDecoder : Decode.Decoder UserData
+userDecoder =
+    Pipeline.decode UserData
+        |> Pipeline.required "username" Decode.string
+
+type alias RetroData = { id : String, name : String, createdAt : Date, participants : List String }
+
+retroDecoder : Decode.Decoder RetroData
+retroDecoder =
+    Pipeline.decode RetroData
+        |> Pipeline.required "id" Decode.string
+        |> Pipeline.required "name" Decode.string
+        |> Pipeline.required "createdAt" decodeDate
+        |> Pipeline.required "participants" (Decode.list Decode.string)
+
+
 listen : String -> (String -> msg) -> Sub msg
 listen = Sock.LowLevel.listen
 
@@ -130,6 +156,8 @@ update data model f =
               , ("vote", runOp voteDecoder Vote)
               , ("error", runOp errorDecoder Error)
               , ("delete", runOp voteDecoder Delete)
+              , ("user", runOp userDecoder User)
+              , ("retro", runOp retroDecoder Retro)
               ]
 
         runMux { id, op, data } model =
@@ -142,50 +170,54 @@ update data model f =
     in
         Sock.LowLevel.update data model runMux
 
-init : String -> String -> String -> String -> String -> Cmd msg
-init url id retroId name token =
-    Sock.LowLevel.send url id "init" <|
+type alias Sender msg = String -> Encode.Value -> Cmd msg
+
+send : String -> String -> String -> Sender msg
+send url id token =
+    Sock.LowLevel.send url id token
+
+joinRetro : Sender msg -> String -> Cmd msg
+joinRetro sender retroId =
+    sender "joinRetro" <|
         Encode.object
             [ ("retroId", Encode.string retroId)
-            , ("name", Encode.string name)
-            , ("token", Encode.string token)
             ]
 
-add : String -> String -> String -> String -> Cmd msg
-add url id columnId cardText =
-    Sock.LowLevel.send url id "add" <|
+add : Sender msg -> String -> String -> Cmd msg
+add sender columnId cardText =
+     sender "add" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardText", Encode.string cardText)
             ]
 
-move : String -> String -> String -> String -> String -> Cmd msg
-move url id columnFrom columnTo cardId =
-    Sock.LowLevel.send url id "move" <|
+move : Sender msg -> String -> String -> String -> Cmd msg
+move sender columnFrom columnTo cardId =
+    sender "move" <|
         Encode.object
             [ ("columnFrom", Encode.string columnFrom)
             , ("columnTo", Encode.string columnTo)
             , ("cardId", Encode.string cardId)
             ]
 
-stage : String -> String -> String -> Cmd msg
-stage url id stage =
-    Sock.LowLevel.send url id "stage" <|
+stage : Sender msg -> String -> Cmd msg
+stage sender stage =
+    sender "stage" <|
         Encode.object
             [ ("stage", Encode.string stage)
             ]
 
-reveal : String -> String -> String -> String -> Cmd msg
-reveal url id columnId cardId =
-    Sock.LowLevel.send url id "reveal" <|
+reveal : Sender msg -> String -> String -> Cmd msg
+reveal sender columnId cardId =
+    sender "reveal" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardId", Encode.string cardId)
             ]
 
-group : String -> String -> String -> String -> String -> String -> Cmd msg
-group url id columnFrom cardFrom columnTo cardTo =
-    Sock.LowLevel.send url id "group" <|
+group : Sender msg -> String -> String -> String -> String -> Cmd msg
+group sender columnFrom cardFrom columnTo cardTo =
+    sender "group" <|
         Encode.object
             [ ("columnFrom", Encode.string columnFrom)
             , ("cardFrom", Encode.string cardFrom)
@@ -193,18 +225,44 @@ group url id columnFrom cardFrom columnTo cardTo =
             , ("cardTo", Encode.string cardTo)
             ]
 
-vote : String -> String -> String -> String -> Cmd msg
-vote url id columnId cardId =
-    Sock.LowLevel.send url id "vote" <|
+vote : Sender msg -> String -> String -> Cmd msg
+vote sender columnId cardId =
+    sender "vote" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardId", Encode.string cardId)
             ]
 
-delete : String -> String -> String -> String -> Cmd msg
-delete url id columnId cardId =
-    Sock.LowLevel.send url id "delete" <|
+delete : Sender msg -> String -> String -> Cmd msg
+delete sender columnId cardId =
+    sender "delete" <|
         Encode.object
             [ ("columnId", Encode.string columnId)
             , ("cardId", Encode.string cardId)
             ]
+
+menu : Sender msg -> Cmd msg
+menu sender =
+    sender "menu" <|
+        Encode.string ""
+
+createRetro : Sender msg -> String -> List String -> Cmd msg
+createRetro sender name users =
+    sender "createRetro" <|
+        Encode.object
+            [ ("name", Encode.string name)
+            , ("users", Encode.list (List.map Encode.string users))
+            ]
+
+decodeDate : Decode.Decoder Date
+decodeDate =
+    let
+        run x =
+            case x of
+                Ok date ->
+                    Decode.succeed date
+
+                Err err ->
+                    Decode.fail err
+    in
+        Decode.string |> Decode.map Date.fromString |> Decode.andThen run

@@ -36,3 +36,7 @@ func (s *Server) serve(ws *websocket.Conn) {
 func (s *Server) Handle(op string, handler Handler) {
 	s.mux.handle(op, handler)
 }
+
+func (s *Server) Auth(authenticate Authenticator) {
+	s.mux.authenticate = authenticate
+}

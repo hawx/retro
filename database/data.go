@@ -30,7 +30,17 @@ func (d *Database) setup() error {
 
     CREATE TABLE IF NOT EXISTS retros (
       Id        TEXT PRIMARY KEY,
-      Stage     TEXT
+      Name      TEXT,
+      Stage     TEXT,
+      CreatedAt DATETIME
+    );
+
+    CREATE TABLE IF NOT EXISTS participants (
+      Retro     TEXT,
+      Username  TEXT,
+      PRIMARY KEY(Username, Retro),
+      FOREIGN KEY(Retro) REFERENCES retros(Id),
+      FOREIGN KEY(Username) REFERENCES users(Username)
     );
 
     CREATE TABLE IF NOT EXISTS columns (
