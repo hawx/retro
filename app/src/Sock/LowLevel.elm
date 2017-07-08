@@ -1,16 +1,20 @@
-module Sock.LowLevel exposing ( listen
-                              , send
-                              , update)
+module Sock.LowLevel
+    exposing
+        ( listen
+        , send
+        , update
+        )
 
-{-| This module provides a basic format for passing websocket messages with.  It
+{-| This module provides a basic format for passing websocket messages with. It
 contains the generic parts of the implementation that define a JSON object with
 "id", "op" and "data" properties.
 -}
 
-import WebSocket
-import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline
+import Json.Encode as Encode
+import WebSocket
+
 
 type alias SocketMsg =
     { id : String
@@ -18,12 +22,15 @@ type alias SocketMsg =
     , data : String
     }
 
+
 type alias AuthenticatedMsg =
     { id : String
     , op : String
     , data : String
     , username : String
-    , token : String }
+    , token : String
+    }
+
 
 socketMsgDecoder : Decode.Decoder SocketMsg
 socketMsgDecoder =
@@ -32,25 +39,28 @@ socketMsgDecoder =
         |> Pipeline.required "op" Decode.string
         |> Pipeline.required "data" Decode.string
 
+
 socketMsgEncoder : SocketMsg -> Encode.Value
 socketMsgEncoder value =
     Encode.object
-        [ ("id", Encode.string value.id)
-        , ("op", Encode.string value.op)
-        , ("data", Encode.string value.data)
+        [ ( "id", Encode.string value.id )
+        , ( "op", Encode.string value.op )
+        , ( "data", Encode.string value.data )
         ]
+
 
 authenticatedMsgEncoder : AuthenticatedMsg -> Encode.Value
 authenticatedMsgEncoder value =
     Encode.object
-        [ ("id", Encode.string value.id)
-        , ("auth", Encode.object
-               [ ("username", Encode.string value.username)
-               , ("token", Encode.string value.token)
-               ]
+        [ ( "id", Encode.string value.id )
+        , ( "auth"
+          , Encode.object
+                [ ( "username", Encode.string value.username )
+                , ( "token", Encode.string value.token )
+                ]
           )
-        , ("op", Encode.string value.op)
-        , ("data", Encode.string value.data)
+        , ( "op", Encode.string value.op )
+        , ( "data", Encode.string value.data )
         ]
 
 
@@ -66,8 +76,12 @@ listen : String -> (String -> msg) -> Sub msg
 listen url tagger =
     WebSocket.listen url tagger
 
-update : String -> model -> (SocketMsg -> model -> (model, Cmd msg)) -> (model, Cmd msg)
+
+update : String -> model -> (SocketMsg -> model -> ( model, Cmd msg )) -> ( model, Cmd msg )
 update data model f =
     case Decode.decodeString socketMsgDecoder data of
-        Ok socketMsg -> f socketMsg model
-        Err _ -> (model, Cmd.none)
+        Ok socketMsg ->
+            f socketMsg model
+
+        Err _ ->
+            ( model, Cmd.none )
