@@ -10,6 +10,8 @@ import Page.Retro as Retro
 import Route exposing (Route)
 import Sock
 import String
+import Views.Footer
+import Views.SignIn
 
 
 main =
@@ -228,13 +230,13 @@ view model =
         Just userId ->
             Html.div []
                 [ innerView userId model
-                , footer
+                , Views.Footer.view
                 ]
 
         Nothing ->
             Html.div []
-                [ signInModal
-                , footer
+                [ Views.SignIn.view
+                , Views.Footer.view
                 ]
 
 
@@ -246,30 +248,6 @@ innerView userId model =
 
         Route.Retro retroId ->
             Html.map RetroMsg (Retro.view userId model.retro)
-
-
-signInModal : Html msg
-signInModal =
-    Bulma.modal
-        [ Bulma.box []
-            [ Html.a
-                [ Attr.class "button is-primary"
-                , Attr.href "/oauth/login"
-                ]
-                [ Html.text "Sign-in with GitHub" ]
-            ]
-        ]
-
-
-footer : Html msg
-footer =
-    Html.footer [ Attr.class "footer" ]
-        [ Html.div [ Attr.class "container" ]
-            [ Html.div [ Attr.class "content has-text-centered" ]
-                [ Html.text "A link to github?"
-                ]
-            ]
-        ]
 
 
 
