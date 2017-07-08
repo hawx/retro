@@ -1,4 +1,4 @@
-module Column
+module Data.Column
     exposing
         ( Column
         , addCard
@@ -8,7 +8,7 @@ module Column
         , updateCard
         )
 
-import Card exposing (Card)
+import Data.Card exposing (Card)
 import Dict exposing (Dict)
 import List
 

@@ -10,15 +10,15 @@ module Page.Retro
         )
 
 import Bulma
-import Card exposing (Card, Content)
-import Column exposing (Column)
+import Data.Card as Card exposing (Card, Content)
+import Data.Column as Column exposing (Column)
+import Data.Retro as Retro exposing (Retro)
 import Dict exposing (Dict)
 import DragAndDrop
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
 import Html.Events.Extra as ExtraEvent
-import Retro exposing (Retro)
 import Route
 import Sock
 

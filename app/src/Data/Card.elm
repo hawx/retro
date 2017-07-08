@@ -1,4 +1,4 @@
-module Card
+module Data.Card
     exposing
         ( Card
         , Content
