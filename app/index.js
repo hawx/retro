@@ -2,7 +2,7 @@
 
 require('./index.html');
 require('./styles.scss');
-var Elm = require('./Main');
+var Elm = require('./src/Main');
 
 var qs = window.location.search.substring(1).split('&').reduce(function (a, e) {
   var parts = e.split('=');
