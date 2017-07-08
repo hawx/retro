@@ -30,10 +30,11 @@
 }
 
 .card textarea {
-  overflow: hidden;
-  overflow-wrap: break-word;
+  word-break: normal;
+  font-size: 1em;
   resize: none;
   height: 54px;
+  width: 100%;
   background: 0 0;
   border: none;
   box-shadow: none;
