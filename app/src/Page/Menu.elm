@@ -126,49 +126,80 @@ acceptablePeople currentUser { participant, participants, possibleParticipants }
 
 view : String -> Model -> Html Msg
 view currentUser model =
-    let
-        title =
-            Html.section [ Attr.class "hero is-dark is-bold" ]
-                [ Html.div [ Attr.class "hero-body" ]
-                    [ Bulma.container
-                        [ Bulma.title "Retro" ]
+    Html.div []
+        [ title
+        , Bulma.section
+            [ Bulma.container
+                [ Bulma.columns []
+                    [ Bulma.column []
+                        [ choices model ]
+                    , Bulma.column []
+                        [ Maybe.map currentChoice model.currentChoice
+                            |> Maybe.withDefault (Html.text "")
+                        ]
+                    , Bulma.column []
+                        [ Bulma.box []
+                            [ createNew currentUser model ]
+                        ]
                     ]
                 ]
+            ]
+        ]
 
+
+title : Html msg
+title =
+    Html.section [ Attr.class "hero is-dark is-bold" ]
+        [ Html.div [ Attr.class "hero-body" ]
+            [ Bulma.container
+                [ Bulma.title "Retro" ]
+            ]
+        ]
+
+
+choices : Model -> Html Msg
+choices model =
+    let
         choice current { id, name } =
             Html.li []
                 [ Html.a
                     [ Event.onClick (ShowRetroDetails id)
-                    , Attr.classList [ ( "is-active", Just id == Maybe.map .id current ) ]
+                    , Attr.classList [ ( "is-active", Just id == Maybe.map .id model.currentChoice ) ]
                     ]
                     [ Html.text name ]
                 ]
+    in
+    Html.div []
+        [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Your Retros" ]
+        , Html.div [ Attr.class "menu" ]
+            [ Html.ul [ Attr.class "menu-list" ] (List.map (choice model.currentChoice) model.retroList)
+            ]
+        ]
 
-        choices current =
-            Html.div []
-                [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Your Retros" ]
-                , Html.div [ Attr.class "menu" ]
-                    [ Html.ul [ Attr.class "menu-list" ] (List.map (choice current) model.retroList)
-                    ]
-                ]
 
+currentChoice : Retro -> Html msg
+currentChoice retro =
+    let
         formatDate date =
             Date.Format.format "%d %B, %Y at %I:%M%P" date
-
-        currentChoice retro =
-            Html.div []
-                [ Html.h2 [ Attr.class "title is-4" ] [ Html.text retro.name ]
-                , Html.h3 [ Attr.class "subtitle is-6" ] [ Html.text (formatDate retro.createdAt) ]
-                , Html.div [ Attr.class "control" ] <| List.map Bulma.tag retro.participants
-                , Html.div [ Attr.class "control" ]
-                    [ Html.a
-                        [ Attr.class "button is-primary"
-                        , Attr.href (Route.toUrl (Route.Retro retro.id))
-                        ]
-                        [ Html.text "Open" ]
-                    ]
+    in
+    Html.div []
+        [ Html.h2 [ Attr.class "title is-4" ] [ Html.text retro.name ]
+        , Html.h3 [ Attr.class "subtitle is-6" ] [ Html.text (formatDate retro.createdAt) ]
+        , Html.div [ Attr.class "control" ] <| List.map Bulma.tag retro.participants
+        , Html.div [ Attr.class "control" ]
+            [ Html.a
+                [ Attr.class "button is-primary"
+                , Attr.href (Route.toUrl (Route.Retro retro.id))
                 ]
+                [ Html.text "Open" ]
+            ]
+        ]
 
+
+createNew : String -> Model -> Html Msg
+createNew currentUser model =
+    let
         currentUserParticipant =
             Html.span [ Attr.class "tag is-medium" ]
                 [ Html.text currentUser ]
@@ -187,80 +218,49 @@ view currentUser model =
             Html.div [ Attr.class "control" ]
                 (currentUserParticipant :: List.map participant model.participants)
 
-        participantSuggestions =
-            let
-                matching =
-                    acceptablePeople currentUser model
-
-                item name =
-                    Html.li []
-                        [ Html.a [ Event.onClick (SelectParticipant name) ]
-                            [ Html.text name ]
-                        ]
-            in
-            List.map item matching
-                |> Html.ul [ Attr.class "autocomplete-list" ]
-
-        createNew =
-            Html.div []
-                [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
-                , Bulma.label "Name"
-                , Bulma.input [ Event.onInput SetRetroName ]
-                , Bulma.label "Participants"
-                , participants
-                , Html.div [ Attr.class "control is-grouped" ] <|
-                    List.filterMap identity
-                        [ Just <|
-                            Html.p [ Attr.class "control is-expanded" ]
-                                [ Html.input
-                                    [ Attr.class "input"
-                                    , Event.onInput SetParticipant
-                                    ]
-                                    []
-                                ]
-                        , if model.participant == "" || acceptablePeople currentUser model == [] then
-                            Nothing
-                          else
-                            Just participantSuggestions
-                        , Just <|
-                            Html.button
-                                [ Attr.class "button is-info"
-                                , Event.onClick AddParticipant
-                                ]
-                                [ Html.text "Add" ]
-                        ]
-                , Html.div [ Attr.class "level" ]
-                    [ Html.div [ Attr.class "level-left" ] []
-                    , Html.div [ Attr.class "level-right" ]
-                        [ Html.button
-                            [ Attr.class "button is-primary"
-                            , Event.onClick CreateRetro
-                            , Attr.disabled (model.retroName == "" || model.participants == [])
-                            ]
-                            [ Html.text "Create" ]
-                        ]
-                    ]
+        participantItem name =
+            Html.li []
+                [ Html.a [ Event.onClick (SelectParticipant name) ]
+                    [ Html.text name ]
                 ]
+
+        participantSuggestions =
+            List.map participantItem (acceptablePeople currentUser model)
+                |> Html.ul [ Attr.class "autocomplete-list" ]
     in
     Html.div []
-        [ title
-        , Bulma.section
-            [ Bulma.container
-                [ Bulma.columns []
-                    [ Bulma.column []
-                        [ choices model.currentChoice ]
-                    , Bulma.column [] <|
-                        case model.currentChoice of
-                            Just retro ->
-                                [ currentChoice retro ]
-
-                            Nothing ->
-                                []
-                    , Bulma.column []
-                        [ Bulma.box []
-                            [ createNew ]
-                        ]
+        [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
+        , Bulma.label "Name"
+        , Bulma.input [ Event.onInput SetRetroName ]
+        , Bulma.label "Participants"
+        , participants
+        , Html.div [ Attr.class "control is-grouped" ]
+            [ Html.p [ Attr.class "control is-expanded" ]
+                [ Html.input
+                    [ Attr.class "input"
+                    , Event.onInput SetParticipant
                     ]
+                    []
+                ]
+            , if model.participant == "" || acceptablePeople currentUser model == [] then
+                Html.text ""
+              else
+                participantSuggestions
+            , Html.button
+                [ Attr.class "button is-info"
+                , Event.onClick AddParticipant
+                ]
+                [ Html.text "Add" ]
+            ]
+        , Html.div [ Attr.class "level" ]
+            [ Html.div [ Attr.class "level-left" ] []
+            , Html.div [ Attr.class "level-right" ]
+                [ Html.button
+                    [ Attr.class "button is-primary"
+                    , Event.onClick CreateRetro
+                    , Attr.disabled (model.retroName == "" || model.participants == [])
+                    ]
+                    [ Html.text "Create" ]
                 ]
             ]
         ]
