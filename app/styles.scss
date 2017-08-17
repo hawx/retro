@@ -1,7 +1,7 @@
 @import "~bulma";
 
 .content {
-  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .card, .not-card {
