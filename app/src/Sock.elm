@@ -13,6 +13,7 @@ module Sock
         , reveal
         , send
         , stage
+        , unvote
         , update
         , vote
         )
@@ -39,6 +40,7 @@ type MsgData
     | Reveal RevealData
     | Group GroupData
     | Vote VoteData
+    | Unvote VoteData
     | Delete DeleteData
     | User UserData
     | Retro RetroData
@@ -210,6 +212,7 @@ update data model f =
                 , ( "reveal", runOp revealDecoder Reveal )
                 , ( "group", runOp groupDecoder Group )
                 , ( "vote", runOp voteDecoder Vote )
+                , ( "unvote", runOp voteDecoder Unvote )
                 , ( "error", runOp errorDecoder Error )
                 , ( "delete", runOp deleteDecoder Delete )
                 , ( "user", runOp userDecoder User )
@@ -294,6 +297,15 @@ group sender columnFrom cardFrom columnTo cardTo =
 vote : Sender msg -> String -> String -> Cmd msg
 vote sender columnId cardId =
     sender "vote" <|
+        Encode.object
+            [ ( "columnId", Encode.string columnId )
+            , ( "cardId", Encode.string cardId )
+            ]
+
+
+unvote : Sender msg -> String -> String -> Cmd msg
+unvote sender columnId cardId =
+    sender "unvote" <|
         Encode.object
             [ ( "columnId", Encode.string columnId )
             , ( "cardId", Encode.string cardId )

@@ -88,14 +88,14 @@ revealCard columnId cardId =
     updateCard columnId cardId (\card -> { card | revealed = True })
 
 
-voteCard : String -> String -> Retro -> Retro
-voteCard columnId cardId =
-    updateCard columnId cardId (\card -> { card | votes = card.votes + 1, totalVotes = card.totalVotes + 1 })
+voteCard : Int -> String -> String -> Retro -> Retro
+voteCard count columnId cardId =
+    updateCard columnId cardId (\card -> { card | votes = card.votes + count, totalVotes = card.totalVotes + count })
 
 
-totalVoteCard : String -> String -> Retro -> Retro
-totalVoteCard columnId cardId =
-    updateCard columnId cardId (\card -> { card | totalVotes = card.totalVotes + 1 })
+totalVoteCard : Int -> String -> String -> Retro -> Retro
+totalVoteCard count columnId cardId =
+    updateCard columnId cardId (\card -> { card | totalVotes = card.totalVotes + count })
 
 
 addContent : String -> String -> Content -> Retro -> Retro

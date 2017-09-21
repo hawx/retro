@@ -58,6 +58,7 @@ type Msg
     | SetStage Retro.Stage
     | Reveal String String
     | Vote String String
+    | Unvote String String
     | DnD (DragAndDrop.Msg ( String, String ) ( String, Maybe String ))
 
 
@@ -66,6 +67,9 @@ update sender msg model =
     case msg of
         Vote columnId cardId ->
             model ! [ Sock.vote sender columnId cardId ]
+
+        Unvote columnId cardId ->
+            model ! [ Sock.unvote sender columnId cardId ]
 
         SetStage stage ->
             { model | retro = Retro.setStage stage model.retro }
@@ -181,9 +185,15 @@ socketUpdate user ( id, msgData ) model =
 
         Sock.Vote { userId, columnId, cardId } ->
             if Just userId == user then
-                { model | retro = Retro.voteCard columnId cardId model.retro } ! []
+                { model | retro = Retro.voteCard 1 columnId cardId model.retro } ! []
             else
-                { model | retro = Retro.totalVoteCard columnId cardId model.retro } ! []
+                { model | retro = Retro.totalVoteCard 1 columnId cardId model.retro } ! []
+
+        Sock.Unvote { userId, columnId, cardId } ->
+            if Just userId == user then
+                { model | retro = Retro.voteCard -1 columnId cardId model.retro } ! []
+            else
+                { model | retro = Retro.totalVoteCard -1 columnId cardId model.retro } ! []
 
         Sock.Delete { columnId, cardId } ->
             { model | retro = Retro.removeCard columnId cardId model.retro } ! []
@@ -349,7 +359,11 @@ cardView connId stage dnd columnId ( cardId, card ) =
                         [ contentsView card.contents ]
                     , Bulma.cardFooter []
                         [ Bulma.cardFooterItem [] (toString card.votes)
-                        , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "Vote"
+                        , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "+"
+                        , if card.votes > 0 then
+                            Bulma.cardFooterItem [ Event.onClick (Unvote columnId cardId) ] "-"
+                          else
+                            Bulma.cardFooterItem [] "-"
                         ]
                     ]
                 ]
