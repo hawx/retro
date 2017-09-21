@@ -90,7 +90,12 @@ revealCard columnId cardId =
 
 voteCard : String -> String -> Retro -> Retro
 voteCard columnId cardId =
-    updateCard columnId cardId (\card -> { card | votes = card.votes + 1 })
+    updateCard columnId cardId (\card -> { card | votes = card.votes + 1, totalVotes = card.totalVotes + 1 })
+
+
+totalVoteCard : String -> String -> Retro -> Retro
+totalVoteCard columnId cardId =
+    updateCard columnId cardId (\card -> { card | totalVotes = card.totalVotes + 1 })
 
 
 addContent : String -> String -> Content -> Retro -> Retro

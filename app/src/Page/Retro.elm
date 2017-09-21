@@ -130,8 +130,8 @@ parseStage s =
             Nothing
 
 
-socketUpdate : ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate ( id, msgData ) model =
+socketUpdate : Maybe String -> ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
+socketUpdate user ( id, msgData ) model =
     case msgData of
         Sock.Stage { stage } ->
             case parseStage stage of
@@ -141,11 +141,12 @@ socketUpdate ( id, msgData ) model =
                 Nothing ->
                     model ! []
 
-        Sock.Card { columnId, cardId, revealed, votes } ->
+        Sock.Card { columnId, cardId, revealed, votes, totalVotes } ->
             let
                 card =
                     { id = cardId
                     , votes = votes
+                    , totalVotes = totalVotes
                     , revealed = revealed
                     , contents = []
                     }
@@ -178,11 +179,17 @@ socketUpdate ( id, msgData ) model =
         Sock.Group { columnFrom, cardFrom, columnTo, cardTo } ->
             { model | retro = Retro.groupCards ( columnFrom, cardFrom ) ( columnTo, cardTo ) model.retro } ! []
 
-        Sock.Vote { columnId, cardId } ->
-            { model | retro = Retro.voteCard columnId cardId model.retro } ! []
+        Sock.Vote { userId, columnId, cardId } ->
+            if Just userId == user then
+                { model | retro = Retro.voteCard columnId cardId model.retro } ! []
+            else
+                { model | retro = Retro.totalVoteCard columnId cardId model.retro } ! []
 
         Sock.Delete { columnId, cardId } ->
             { model | retro = Retro.removeCard columnId cardId model.retro } ! []
+
+        Sock.Error err ->
+            Debug.log ("Sock.Error: " ++ toString err) model ! []
 
         _ ->
             model ! []

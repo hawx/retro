@@ -1,28 +1,33 @@
 package database
 
 type Card struct {
-	Id       string
-	Column   string
-	Votes    int
-	Revealed bool
+	Id         string
+	Column     string
+	Revealed   bool
+	Votes      int
+	TotalVotes int
 }
 
 func (d *Database) AddCard(card Card) error {
-	_, err := d.db.Exec("INSERT INTO cards(Id, Column, Votes, Revealed) VALUES (?, ?, ?, ?)",
+	_, err := d.db.Exec("INSERT INTO cards(Id, Column, Revealed) VALUES (?, ?, ?)",
 		card.Id,
 		card.Column,
-		card.Votes,
 		card.Revealed)
 
 	return err
 }
 
 func (d *Database) GetCard(id string) (Card, error) {
-	row := d.db.QueryRow("SELECT Id, Column, Votes, Revealed FROM cards WHERE Id=?",
+	row := d.db.QueryRow(`
+    SELECT cards.Id, cards.Column, cards.Revealed, COUNT(votes.Id)
+    FROM cards
+    JOIN votes ON cards.Id = votes.Card
+    GROUP BY cards.Id, cards.Column, cards.Revealed
+    WHERE Id=?`,
 		id)
 
 	var card Card
-	err := row.Scan(&card.Id, &card.Column, &card.Votes, &card.Revealed)
+	err := row.Scan(&card.Id, &card.Column, &card.Revealed, &card.Votes)
 
 	return card, err
 }
@@ -42,13 +47,6 @@ func (d *Database) RevealCard(id string) error {
 	return err
 }
 
-func (d *Database) VoteCard(id string) error {
-	_, err := d.db.Exec("UPDATE cards SET Votes=Votes + 1 WHERE Id=?",
-		id)
-
-	return err
-}
-
 func (d *Database) DeleteCard(id string) error {
 	_, err := d.db.Exec("DELETE FROM cards WHERE Id=?",
 		id)
@@ -62,9 +60,9 @@ func (d *Database) GroupCards(cardFrom, cardTo string) error {
 		return err
 	}
 
-	_, err = tx.Exec(`UPDATE cards SET Votes=Votes + ( SELECT Votes FROM cards WHERE Id=? ) WHERE Id=?`,
-		cardFrom,
-		cardTo)
+	_, err = tx.Exec("UPDATE votes SET Card=? WHERE Card=?",
+		cardTo,
+		cardFrom)
 
 	if err != nil {
 		tx.Rollback()
@@ -91,9 +89,18 @@ func (d *Database) GroupCards(cardFrom, cardTo string) error {
 	return tx.Commit()
 }
 
-func (d *Database) GetCards(columnId string) (cards []Card, err error) {
-	rows, err := d.db.Query("SELECT Id, Column, Votes, Revealed FROM cards WHERE Column=?",
-		columnId)
+func (d *Database) GetCards(username, columnId string) (cards []Card, err error) {
+	rows, err := d.db.Query(`
+    SELECT cards.Id,
+           cards.Column,
+           cards.Revealed,
+           SUM(CASE WHEN votes.Username = ? THEN 1 ELSE 0 END),
+           COUNT(votes.Id)
+    FROM cards
+    LEFT JOIN votes ON cards.Id = votes.Card
+    WHERE cards.Column = ?
+    GROUP BY cards.Id, cards.Column, cards.Revealed`,
+		username, columnId)
 	if err != nil {
 		return cards, err
 	}
@@ -101,7 +108,7 @@ func (d *Database) GetCards(columnId string) (cards []Card, err error) {
 
 	for rows.Next() {
 		var card Card
-		if err = rows.Scan(&card.Id, &card.Column, &card.Votes, &card.Revealed); err != nil {
+		if err = rows.Scan(&card.Id, &card.Column, &card.Revealed, &card.Votes, &card.TotalVotes); err != nil {
 			return cards, err
 		}
 		cards = append(cards, card)

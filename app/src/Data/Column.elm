@@ -47,7 +47,7 @@ cardsByVote columns =
         |> List.map (.cards >> Dict.values)
         |> List.concat
         |> List.filter .revealed
-        |> groupBy .votes
+        |> groupBy .totalVotes
         |> Dict.toList
         |> List.sortBy (\( a, _ ) -> -a)
 
