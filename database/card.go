@@ -17,21 +17,6 @@ func (d *Database) AddCard(card Card) error {
 	return err
 }
 
-func (d *Database) GetCard(id string) (Card, error) {
-	row := d.db.QueryRow(`
-    SELECT cards.Id, cards.Column, cards.Revealed, COUNT(votes.Id)
-    FROM cards
-    JOIN votes ON cards.Id = votes.Card
-    GROUP BY cards.Id, cards.Column, cards.Revealed
-    WHERE Id=?`,
-		id)
-
-	var card Card
-	err := row.Scan(&card.Id, &card.Column, &card.Revealed, &card.Votes)
-
-	return card, err
-}
-
 func (d *Database) MoveCard(id, columnId string) error {
 	_, err := d.db.Exec("UPDATE cards SET Column=? WHERE Id=?",
 		columnId,
