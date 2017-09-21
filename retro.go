@@ -45,10 +45,11 @@ type columnData struct {
 }
 
 type cardData struct {
-	ColumnId string `json:"columnId"`
-	CardId   string `json:"cardId"`
-	Revealed bool   `json:"revealed"`
-	Votes    int    `json:"votes"`
+	ColumnId   string `json:"columnId"`
+	CardId     string `json:"cardId"`
+	Revealed   bool   `json:"revealed"`
+	Votes      int    `json:"votes"`
+	TotalVotes int    `json:"totalVotes"`
 }
 
 type contentData struct {
@@ -76,6 +77,12 @@ type groupData struct {
 }
 
 type voteData struct {
+	UserId   string `json:"userId"`
+	ColumnId string `json:"columnId"`
+	CardId   string `json:"cardId"`
+}
+
+type deleteData struct {
 	ColumnId string `json:"columnId"`
 	CardId   string `json:"cardId"`
 }
@@ -163,9 +170,12 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		for _, column := range columns {
 			conn.Send("", "column", columnData{column.Id, column.Name, column.Order})
 
-			cards, _ := r.db.GetCards(column.Id)
+			cards, err := r.db.GetCards(conn.Name, column.Id)
+			if err != nil {
+				log.Println(err)
+			}
 			for _, card := range cards {
-				conn.Send("", "card", cardData{column.Id, card.Id, card.Revealed, card.Votes})
+				conn.Send("", "card", cardData{column.Id, card.Id, card.Revealed, card.Votes, card.TotalVotes})
 
 				contents, _ := r.db.GetContents(card.Id)
 				for _, content := range contents {
@@ -214,11 +224,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		card := database.Card{
 			Id:       strId(),
 			Column:   args.ColumnId,
-			Votes:    0,
 			Revealed: false,
 		}
 
-		r.db.AddCard(card)
+		if err := r.db.AddCard(card); err != nil {
+			log.Println("add db:", err)
+			return
+		}
 
 		content := database.Content{
 			Id:     strId(),
@@ -227,9 +239,12 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			Author: conn.Name,
 		}
 
-		r.db.AddContent(content)
+		if err := r.db.AddContent(content); err != nil {
+			log.Println("add db:", err)
+			return
+		}
 
-		conn.Broadcast("", "card", cardData{args.ColumnId, card.Id, card.Revealed, card.Votes})
+		conn.Broadcast("", "card", cardData{args.ColumnId, card.Id, card.Revealed, card.Votes, card.TotalVotes})
 
 		conn.Broadcast(content.Author, "content", contentData{args.ColumnId, content.Card, content.Text})
 	})
@@ -287,13 +302,26 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			return
 		}
 
-		r.db.VoteCard(args.CardId)
+		args.UserId = conn.Name
+		r.db.Vote(conn.Name, args.CardId)
 
 		conn.Broadcast(conn.Name, "vote", args)
 	})
 
-	mux.Handle("delete", func(conn *sock.Conn, data []byte) {
+	mux.Handle("unvote", func(conn *sock.Conn, data []byte) {
 		var args voteData
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		args.UserId = conn.Name
+		r.db.Unvote(conn.Name, args.CardId)
+
+		conn.Broadcast(conn.Name, "unvote", args)
+	})
+
+	mux.Handle("delete", func(conn *sock.Conn, data []byte) {
+		var args deleteData
 		if err := json.Unmarshal(data, &args); err != nil {
 			return
 		}

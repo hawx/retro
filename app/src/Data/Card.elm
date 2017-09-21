@@ -8,8 +8,9 @@ module Data.Card
 
 type alias Card =
     { id : String
-    , votes : Int
     , revealed : Bool
+    , votes : Int
+    , totalVotes : Int
     , contents : List Content
     }
 

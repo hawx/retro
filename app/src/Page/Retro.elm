@@ -58,6 +58,7 @@ type Msg
     | SetStage Retro.Stage
     | Reveal String String
     | Vote String String
+    | Unvote String String
     | DnD (DragAndDrop.Msg ( String, String ) ( String, Maybe String ))
 
 
@@ -66,6 +67,9 @@ update sender msg model =
     case msg of
         Vote columnId cardId ->
             model ! [ Sock.vote sender columnId cardId ]
+
+        Unvote columnId cardId ->
+            model ! [ Sock.unvote sender columnId cardId ]
 
         SetStage stage ->
             { model | retro = Retro.setStage stage model.retro }
@@ -130,8 +134,8 @@ parseStage s =
             Nothing
 
 
-socketUpdate : ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate ( id, msgData ) model =
+socketUpdate : Maybe String -> ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
+socketUpdate user ( id, msgData ) model =
     case msgData of
         Sock.Stage { stage } ->
             case parseStage stage of
@@ -141,11 +145,12 @@ socketUpdate ( id, msgData ) model =
                 Nothing ->
                     model ! []
 
-        Sock.Card { columnId, cardId, revealed, votes } ->
+        Sock.Card { columnId, cardId, revealed, votes, totalVotes } ->
             let
                 card =
                     { id = cardId
                     , votes = votes
+                    , totalVotes = totalVotes
                     , revealed = revealed
                     , contents = []
                     }
@@ -178,11 +183,23 @@ socketUpdate ( id, msgData ) model =
         Sock.Group { columnFrom, cardFrom, columnTo, cardTo } ->
             { model | retro = Retro.groupCards ( columnFrom, cardFrom ) ( columnTo, cardTo ) model.retro } ! []
 
-        Sock.Vote { columnId, cardId } ->
-            { model | retro = Retro.voteCard columnId cardId model.retro } ! []
+        Sock.Vote { userId, columnId, cardId } ->
+            if Just userId == user then
+                { model | retro = Retro.voteCard 1 columnId cardId model.retro } ! []
+            else
+                { model | retro = Retro.totalVoteCard 1 columnId cardId model.retro } ! []
+
+        Sock.Unvote { userId, columnId, cardId } ->
+            if Just userId == user then
+                { model | retro = Retro.voteCard -1 columnId cardId model.retro } ! []
+            else
+                { model | retro = Retro.totalVoteCard -1 columnId cardId model.retro } ! []
 
         Sock.Delete { columnId, cardId } ->
             { model | retro = Retro.removeCard columnId cardId model.retro } ! []
+
+        Sock.Error err ->
+            Debug.log ("Sock.Error: " ++ toString err) model ! []
 
         _ ->
             model ! []
@@ -342,7 +359,11 @@ cardView connId stage dnd columnId ( cardId, card ) =
                         [ contentsView card.contents ]
                     , Bulma.cardFooter []
                         [ Bulma.cardFooterItem [] (toString card.votes)
-                        , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "Vote"
+                        , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "+"
+                        , if card.votes > 0 then
+                            Bulma.cardFooterItem [ Event.onClick (Unvote columnId cardId) ] "-"
+                          else
+                            Bulma.cardFooterItem [] "-"
                         ]
                     ]
                 ]

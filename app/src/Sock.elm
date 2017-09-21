@@ -13,6 +13,7 @@ module Sock
         , reveal
         , send
         , stage
+        , unvote
         , update
         , vote
         )
@@ -39,7 +40,8 @@ type MsgData
     | Reveal RevealData
     | Group GroupData
     | Vote VoteData
-    | Delete VoteData
+    | Unvote VoteData
+    | Delete DeleteData
     | User UserData
     | Retro RetroData
 
@@ -77,7 +79,7 @@ columnDecoder =
 
 
 type alias CardData =
-    { columnId : String, cardId : String, revealed : Bool, votes : Int }
+    { columnId : String, cardId : String, revealed : Bool, votes : Int, totalVotes : Int }
 
 
 cardDecoder : Decode.Decoder CardData
@@ -87,6 +89,7 @@ cardDecoder =
         |> Pipeline.required "cardId" Decode.string
         |> Pipeline.required "revealed" Decode.bool
         |> Pipeline.required "votes" Decode.int
+        |> Pipeline.required "totalVotes" Decode.int
 
 
 type alias ContentData =
@@ -138,12 +141,24 @@ groupDecoder =
 
 
 type alias VoteData =
-    { columnId : String, cardId : String }
+    { userId : String, columnId : String, cardId : String }
 
 
 voteDecoder : Decode.Decoder VoteData
 voteDecoder =
     Pipeline.decode VoteData
+        |> Pipeline.required "userId" Decode.string
+        |> Pipeline.required "columnId" Decode.string
+        |> Pipeline.required "cardId" Decode.string
+
+
+type alias DeleteData =
+    { columnId : String, cardId : String }
+
+
+deleteDecoder : Decode.Decoder DeleteData
+deleteDecoder =
+    Pipeline.decode DeleteData
         |> Pipeline.required "columnId" Decode.string
         |> Pipeline.required "cardId" Decode.string
 
@@ -197,8 +212,9 @@ update data model f =
                 , ( "reveal", runOp revealDecoder Reveal )
                 , ( "group", runOp groupDecoder Group )
                 , ( "vote", runOp voteDecoder Vote )
+                , ( "unvote", runOp voteDecoder Unvote )
                 , ( "error", runOp errorDecoder Error )
-                , ( "delete", runOp voteDecoder Delete )
+                , ( "delete", runOp deleteDecoder Delete )
                 , ( "user", runOp userDecoder User )
                 , ( "retro", runOp retroDecoder Retro )
                 ]
@@ -281,6 +297,15 @@ group sender columnFrom cardFrom columnTo cardTo =
 vote : Sender msg -> String -> String -> Cmd msg
 vote sender columnId cardId =
     sender "vote" <|
+        Encode.object
+            [ ( "columnId", Encode.string columnId )
+            , ( "cardId", Encode.string cardId )
+            ]
+
+
+unvote : Sender msg -> String -> String -> Cmd msg
+unvote sender columnId cardId =
+    sender "unvote" <|
         Encode.object
             [ ( "columnId", Encode.string columnId )
             , ( "cardId", Encode.string cardId )

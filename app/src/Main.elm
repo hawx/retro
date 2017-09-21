@@ -139,7 +139,7 @@ update msg model =
         Socket data ->
             let
                 ( retroModel, retroCmd ) =
-                    Sock.update data model.retro Retro.socketUpdate
+                    Sock.update data model.retro (Retro.socketUpdate model.user)
 
                 ( menuModel, menuCmd ) =
                     Sock.update data model.menu Menu.socketUpdate

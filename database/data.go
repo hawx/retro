@@ -54,7 +54,6 @@ func (d *Database) setup() error {
     CREATE TABLE IF NOT EXISTS cards (
       Id        TEXT PRIMARY KEY,
       Column    TEXT,
-      Votes     INTEGER,
       Revealed  BOOLEAN,
       FOREIGN KEY(Column) REFERENCES columns(Id)
     );
@@ -66,6 +65,14 @@ func (d *Database) setup() error {
       Author    TEXT,
       FOREIGN KEY(Card) REFERENCES cards(Id),
       FOREIGN KEY(Author) REFERENCES users(Username)
+    );
+
+    CREATE TABLE IF NOT EXISTS votes (
+      Id        INTEGER PRIMARY KEY,
+      Username  TEXT,
+      Card      TEXT,
+      FOREIGN KEY(Username) REFERENCES users(Username),
+      FOREIGN KEY(Card) REFERENCES cards(Id)
     );
   `)
 
