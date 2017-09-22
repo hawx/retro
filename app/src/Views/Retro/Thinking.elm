@@ -1,9 +1,9 @@
 module Views.Retro.Thinking exposing (view)
 
 import Bulma
-import Data.Card as Card exposing (Card, Content)
-import Data.Column as Column exposing (Column)
-import Data.Retro as Retro exposing (Retro)
+import Data.Card as Card exposing (Card)
+import Data.Column exposing (Column)
+import Data.Retro as Retro
 import Dict exposing (Dict)
 import DragAndDrop
 import Html exposing (Html)
@@ -12,8 +12,6 @@ import Html.Events as Event
 import Html.Events.Extra as ExtraEvent
 import Page.RetroModel exposing (..)
 import Page.RetroMsg exposing (Msg(..))
-import Route
-import Sock
 import Views.Retro.Contents
 import Views.Retro.TitleCard
 
@@ -45,11 +43,8 @@ columnView connId stage dnd ( columnId, column ) =
             [ addCardView columnId ]
     in
     Bulma.column
-        ([ Attr.classList
-            [ ( "over", dnd.over == Just ( columnId, Nothing ) )
-            ]
-         ]
-            ++ DragAndDrop.dropzone DnD ( columnId, Nothing )
+        (Attr.classList [ ( "over", dnd.over == Just ( columnId, Nothing ) ) ]
+            :: DragAndDrop.dropzone DnD ( columnId, Nothing )
         )
         (title ++ list ++ add)
 

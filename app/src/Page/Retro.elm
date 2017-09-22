@@ -8,25 +8,18 @@ module Page.Retro
         )
 
 import Bulma
-import Data.Card as Card exposing (Card, Content)
-import Data.Column as Column exposing (Column)
-import Data.Retro as Retro exposing (Retro)
-import Dict exposing (Dict)
+import Data.Retro as Retro
+import Dict
 import DragAndDrop
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Html.Events as Event
-import Html.Events.Extra as ExtraEvent
 import Page.RetroModel exposing (..)
 import Page.RetroMsg exposing (Msg(..))
-import Route
 import Sock
-import Views.Retro.Contents
 import Views.Retro.Discussing
 import Views.Retro.Header
 import Views.Retro.Presenting
 import Views.Retro.Thinking
-import Views.Retro.TitleCard
 import Views.Retro.Voting
 
 

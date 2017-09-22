@@ -8,17 +8,9 @@ module Page.Menu
         )
 
 import Bulma
-import Date exposing (Date)
-import Date.Format
 import Html exposing (Html)
-import Html.Attributes as Attr
-import Html.Events as Event
-import Http
-import Json.Decode as Decode
-import Json.Encode as Encode
 import Page.MenuModel exposing (..)
 import Page.MenuMsg exposing (..)
-import Route
 import Sock
 import Views.Menu.Current
 import Views.Menu.Header
@@ -72,7 +64,7 @@ update sender msg model =
 
 
 socketUpdate : ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate ( id, msgData ) model =
+socketUpdate ( _, msgData ) model =
     case msgData of
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []

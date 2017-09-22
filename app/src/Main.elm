@@ -1,9 +1,6 @@
 port module Main exposing (main)
 
-import Bulma
 import Html exposing (Html)
-import Html.Attributes as Attr
-import Http
 import Navigation
 import Page.Menu as Menu
 import Page.MenuModel as Menu

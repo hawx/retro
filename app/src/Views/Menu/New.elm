@@ -8,51 +8,14 @@ import Page.MenuModel exposing (..)
 import Page.MenuMsg exposing (..)
 
 
-acceptablePeople : String -> Model -> List String
-acceptablePeople currentUser { participant, participants, possibleParticipants } =
-    possibleParticipants
-        |> List.filter (\x -> not (List.member x participants))
-        |> List.filter ((/=) currentUser)
-        |> List.filter (String.contains (String.toLower participant) << String.toLower)
-
-
 view : String -> Model -> Html Msg
 view currentUser model =
-    let
-        currentUserParticipant =
-            Html.span [ Attr.class "tag is-medium" ]
-                [ Html.text currentUser ]
-
-        participant name =
-            Html.span [ Attr.class "tag is-medium" ]
-                [ Html.text name
-                , Html.button
-                    [ Attr.class "delete is-small"
-                    , Event.onClick (DeleteParticipant name)
-                    ]
-                    []
-                ]
-
-        participants =
-            Html.div [ Attr.class "control" ]
-                (currentUserParticipant :: List.map participant model.participants)
-
-        participantItem name =
-            Html.li []
-                [ Html.a [ Event.onClick (SelectParticipant name) ]
-                    [ Html.text name ]
-                ]
-
-        participantSuggestions =
-            List.map participantItem (acceptablePeople currentUser model)
-                |> Html.ul [ Attr.class "autocomplete-list" ]
-    in
     Html.div []
         [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
         , Bulma.label "Name"
         , Bulma.input [ Event.onInput SetRetroName ]
         , Bulma.label "Participants"
-        , participants
+        , participantsView currentUser model
         , Html.div [ Attr.class "control is-grouped" ]
             [ Html.p [ Attr.class "control is-expanded" ]
                 [ Html.input
@@ -64,7 +27,7 @@ view currentUser model =
             , if model.participant == "" || acceptablePeople currentUser model == [] then
                 Html.text ""
               else
-                participantSuggestions
+                participantSuggestions currentUser model
             , Html.button
                 [ Attr.class "button is-info"
                 , Event.onClick AddParticipant
@@ -83,3 +46,49 @@ view currentUser model =
                 ]
             ]
         ]
+
+
+participantSuggestions : String -> Model -> Html Msg
+participantSuggestions currentUser model =
+    List.map participantItem (acceptablePeople currentUser model)
+        |> Html.ul [ Attr.class "autocomplete-list" ]
+
+
+participantsView : String -> Model -> Html Msg
+participantsView currentUser model =
+    Html.div [ Attr.class "control" ]
+        (currentUserParticipant currentUser :: List.map participantView model.participants)
+
+
+participantView : String -> Html Msg
+participantView name =
+    Html.span [ Attr.class "tag is-medium" ]
+        [ Html.text name
+        , Html.button
+            [ Attr.class "delete is-small"
+            , Event.onClick (DeleteParticipant name)
+            ]
+            []
+        ]
+
+
+participantItem : String -> Html Msg
+participantItem name =
+    Html.li []
+        [ Html.a [ Event.onClick (SelectParticipant name) ]
+            [ Html.text name ]
+        ]
+
+
+currentUserParticipant : String -> Html msg
+currentUserParticipant currentUser =
+    Html.span [ Attr.class "tag is-medium" ]
+        [ Html.text currentUser ]
+
+
+acceptablePeople : String -> Model -> List String
+acceptablePeople currentUser { participant, participants, possibleParticipants } =
+    possibleParticipants
+        |> List.filter (\x -> not (List.member x participants))
+        |> List.filter ((/=) currentUser)
+        |> List.filter (String.contains (String.toLower participant) << String.toLower)

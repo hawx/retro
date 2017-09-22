@@ -1,11 +1,9 @@
 module Views.Retro.Discussing exposing (view)
 
 import Bulma
-import Data.Card as Card exposing (Card, Content)
+import Data.Card exposing (Card)
 import Data.Column as Column exposing (Column)
-import Data.Retro as Retro exposing (Retro)
 import Dict exposing (Dict)
-import DragAndDrop
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.RetroModel exposing (..)

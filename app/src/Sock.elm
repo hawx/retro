@@ -67,7 +67,10 @@ stageDecoder =
 
 
 type alias ColumnData =
-    { columnId : String, columnName : String, columnOrder : Int }
+    { columnId : String
+    , columnName : String
+    , columnOrder : Int
+    }
 
 
 columnDecoder : Decode.Decoder ColumnData
@@ -79,7 +82,12 @@ columnDecoder =
 
 
 type alias CardData =
-    { columnId : String, cardId : String, revealed : Bool, votes : Int, totalVotes : Int }
+    { columnId : String
+    , cardId : String
+    , revealed : Bool
+    , votes : Int
+    , totalVotes : Int
+    }
 
 
 cardDecoder : Decode.Decoder CardData
@@ -93,7 +101,10 @@ cardDecoder =
 
 
 type alias ContentData =
-    { columnId : String, cardId : String, cardText : String }
+    { columnId : String
+    , cardId : String
+    , cardText : String
+    }
 
 
 contentDecoder : Decode.Decoder ContentData
@@ -105,7 +116,10 @@ contentDecoder =
 
 
 type alias MoveData =
-    { columnFrom : String, columnTo : String, cardId : String }
+    { columnFrom : String
+    , columnTo : String
+    , cardId : String
+    }
 
 
 moveDecoder : Decode.Decoder MoveData
@@ -117,7 +131,9 @@ moveDecoder =
 
 
 type alias RevealData =
-    { columnId : String, cardId : String }
+    { columnId : String
+    , cardId : String
+    }
 
 
 revealDecoder : Decode.Decoder RevealData
@@ -128,7 +144,11 @@ revealDecoder =
 
 
 type alias GroupData =
-    { columnFrom : String, cardFrom : String, columnTo : String, cardTo : String }
+    { columnFrom : String
+    , cardFrom : String
+    , columnTo : String
+    , cardTo : String
+    }
 
 
 groupDecoder : Decode.Decoder GroupData
@@ -141,7 +161,10 @@ groupDecoder =
 
 
 type alias VoteData =
-    { userId : String, columnId : String, cardId : String }
+    { userId : String
+    , columnId : String
+    , cardId : String
+    }
 
 
 voteDecoder : Decode.Decoder VoteData
@@ -153,7 +176,9 @@ voteDecoder =
 
 
 type alias DeleteData =
-    { columnId : String, cardId : String }
+    { columnId : String
+    , cardId : String
+    }
 
 
 deleteDecoder : Decode.Decoder DeleteData
@@ -174,7 +199,11 @@ userDecoder =
 
 
 type alias RetroData =
-    { id : String, name : String, createdAt : Date, participants : List String }
+    { id : String
+    , name : String
+    , createdAt : Date
+    , participants : List String
+    }
 
 
 retroDecoder : Decode.Decoder RetroData
