@@ -6,6 +6,8 @@ import Html.Attributes as Attr
 import Http
 import Navigation
 import Page.Menu as Menu
+import Page.MenuModel as Menu
+import Page.MenuMsg as Menu
 import Page.Retro as Retro
 import Route exposing (Route)
 import Sock
