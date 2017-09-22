@@ -188,20 +188,22 @@ socketUpdate user ( id, msgData ) model =
 
 view : String -> Model -> Html Msg
 view userId model =
-    Bulma.section
-        [ Html.div [ Attr.class "container is-fluid" ]
-            [ Views.Retro.Header.view model.retro.stage
-            , case model.retro.stage of
-                Retro.Discussing ->
-                    Views.Retro.Discussing.view userId model
+    Html.div []
+        [ Views.Retro.Header.view model.retro.stage
+        , Bulma.section
+            [ Html.div [ Attr.class "container is-fluid" ]
+                [ case model.retro.stage of
+                    Retro.Discussing ->
+                        Views.Retro.Discussing.view userId model
 
-                Retro.Thinking ->
-                    Views.Retro.Thinking.view userId model
+                    Retro.Thinking ->
+                        Views.Retro.Thinking.view userId model
 
-                Retro.Presenting ->
-                    Views.Retro.Presenting.view userId model
+                    Retro.Presenting ->
+                        Views.Retro.Presenting.view userId model
 
-                Retro.Voting ->
-                    Views.Retro.Voting.view userId model
+                    Retro.Voting ->
+                        Views.Retro.Voting.view userId model
+                ]
             ]
         ]

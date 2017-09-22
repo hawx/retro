@@ -11,17 +11,26 @@ import Route
 
 view : Retro.Stage -> Html Msg
 view current =
-    Bulma.tabs [ Attr.class "is-toggle" ]
-        [ Html.ul [ Attr.class "is-left" ]
-            [ tab current Retro.Thinking
-            , tab current Retro.Presenting
-            , tab current Retro.Voting
-            , tab current Retro.Discussing
+    Html.section [ Attr.class "hero is-dark is-bold" ]
+        [ Html.div [ Attr.class "hero-body" ]
+            [ Bulma.container
+                [ Html.div [ Attr.class "level" ]
+                    [ Bulma.title "Retro"
+                    , Html.a [ Attr.class "button is-outlined is-white", Attr.href (Route.toUrl Route.Menu) ]
+                        [ Html.text "Back" ]
+                    ]
+                ]
             ]
-        , Html.ul [ Attr.class "is-right" ]
-            [ Html.li []
-                [ Html.a [ Attr.href (Route.toUrl Route.Menu) ]
-                    [ Html.text "Quit" ]
+        , Html.div [ Attr.class "hero-foot" ]
+            [ Bulma.container
+                [ Bulma.tabs [ Attr.class "is-boxed is-fullwidth" ]
+                    [ Html.ul []
+                        [ tab current Retro.Thinking
+                        , tab current Retro.Presenting
+                        , tab current Retro.Voting
+                        , tab current Retro.Discussing
+                        ]
+                    ]
                 ]
             ]
         ]
