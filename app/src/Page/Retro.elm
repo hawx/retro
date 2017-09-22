@@ -1,8 +1,6 @@
 module Page.Retro
     exposing
-        ( Model
-        , Msg
-        , empty
+        ( empty
         , mount
         , socketUpdate
         , update
@@ -10,32 +8,19 @@ module Page.Retro
         )
 
 import Bulma
-import Data.Card as Card exposing (Card, Content)
-import Data.Column as Column exposing (Column)
-import Data.Retro as Retro exposing (Retro)
-import Dict exposing (Dict)
+import Data.Retro as Retro
+import Dict
 import DragAndDrop
 import Html exposing (Html)
 import Html.Attributes as Attr
-import Html.Events as Event
-import Html.Events.Extra as ExtraEvent
-import Route
+import Page.RetroModel exposing (..)
+import Page.RetroMsg exposing (Msg(..))
 import Sock
-
-
-type alias CardDragging =
-    ( String, String )
-
-
-type alias CardOver =
-    ( String, Maybe String )
-
-
-type alias Model =
-    { retro : Retro
-    , input : String
-    , dnd : DragAndDrop.Model CardDragging CardOver
-    }
+import Views.Retro.Discussing
+import Views.Retro.Header
+import Views.Retro.Presenting
+import Views.Retro.Thinking
+import Views.Retro.Voting
 
 
 empty : Model
@@ -49,17 +34,6 @@ empty =
 mount : String -> Sock.Sender Msg -> Cmd Msg
 mount retroId sender =
     Sock.joinRetro sender retroId
-
-
-type Msg
-    = ChangeInput String String
-    | CreateCard String
-    | DeleteCard String String
-    | SetStage Retro.Stage
-    | Reveal String String
-    | Vote String String
-    | Unvote String String
-    | DnD (DragAndDrop.Msg ( String, String ) ( String, Maybe String ))
 
 
 update : Sock.Sender Msg -> Msg -> Model -> ( Model, Cmd Msg )
@@ -207,198 +181,22 @@ socketUpdate user ( id, msgData ) model =
 
 view : String -> Model -> Html Msg
 view userId model =
-    Bulma.section
-        [ Html.div [ Attr.class "container is-fluid" ]
-            [ tabsView model.retro.stage
-            , columnsView userId model.retro.stage model.dnd model.retro.columns
-            ]
-        ]
+    Html.div []
+        [ Views.Retro.Header.view model.retro.stage
+        , Bulma.section
+            [ Html.div [ Attr.class "container is-fluid" ]
+                [ case model.retro.stage of
+                    Retro.Discussing ->
+                        Views.Retro.Discussing.view userId model
 
+                    Retro.Thinking ->
+                        Views.Retro.Thinking.view userId model
 
-tabsView : Retro.Stage -> Html Msg
-tabsView stage =
-    let
-        tab s =
-            Html.li
-                [ Attr.classList [ ( "is-active", stage == s ) ]
-                , Event.onClick (SetStage s)
-                ]
-                [ Html.a [] [ Html.text (toString s) ]
-                ]
-    in
-    Bulma.tabs [ Attr.class "is-toggle" ]
-        [ Html.ul [ Attr.class "is-left" ]
-            [ tab Retro.Thinking
-            , tab Retro.Presenting
-            , tab Retro.Voting
-            , tab Retro.Discussing
-            ]
-        , Html.ul [ Attr.class "is-right" ]
-            [ Html.li []
-                [ Html.a [ Attr.href (Route.toUrl Route.Menu) ]
-                    [ Html.text "Quit" ]
-                ]
-            ]
-        ]
+                    Retro.Presenting ->
+                        Views.Retro.Presenting.view userId model
 
-
-columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
-columnsView connId stage dnd columns =
-    if stage == Retro.Discussing then
-        let
-            cardToView card =
-                Bulma.card []
-                    [ Bulma.cardContent [] [ contentsView card.contents ]
-                    ]
-
-            columnView ( vote, cards ) =
-                Bulma.column []
-                    (titleCardView (toString vote) :: List.map cardToView cards)
-        in
-        Column.cardsByVote columns
-            |> List.map columnView
-            |> Bulma.columns [ Attr.class "is-multiline" ]
-    else
-        Dict.toList columns
-            |> List.sortBy (\( _, b ) -> b.order)
-            |> List.map (columnView connId stage dnd)
-            |> Bulma.columns []
-
-
-columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> ( String, Column ) -> Html Msg
-columnView connId stage dnd ( columnId, column ) =
-    let
-        title =
-            [ titleCardView column.name ]
-
-        list =
-            Dict.toList column.cards
-                |> List.map (cardView connId stage dnd columnId)
-                |> List.concat
-
-        add =
-            [ addCardView columnId ]
-    in
-    case stage of
-        Retro.Thinking ->
-            Bulma.column
-                ([ Attr.classList
-                    [ ( "over", dnd.over == Just ( columnId, Nothing ) )
-                    ]
-                 ]
-                    ++ DragAndDrop.dropzone DnD ( columnId, Nothing )
-                )
-                (title ++ list ++ add)
-
-        _ ->
-            Html.div [ Attr.class "column" ]
-                (title ++ list)
-
-
-contentView : Content -> Html Msg
-contentView content =
-    Bulma.content []
-        [ Html.p [ Attr.class "title is-6" ] [ Html.text content.author ]
-        , Html.p [] [ Html.text content.text ]
-        ]
-
-
-contentsView : List Content -> Html Msg
-contentsView contents =
-    contents
-        |> List.map contentView
-        |> List.intersperse (Html.hr [] [])
-        |> Bulma.content []
-
-
-cardView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> ( String, Card ) -> List (Html Msg)
-cardView connId stage dnd columnId ( cardId, card ) =
-    case stage of
-        Retro.Thinking ->
-            if Card.authored connId card then
-                [ Bulma.card (DragAndDrop.draggable DnD ( columnId, cardId ))
-                    [ Bulma.delete [ Event.onClick (DeleteCard columnId cardId) ]
-                    , Bulma.cardContent [] [ contentsView card.contents ]
-                    ]
-                ]
-            else
-                []
-
-        Retro.Presenting ->
-            if card.revealed then
-                [ Bulma.card []
-                    [ Bulma.cardContent [] [ contentsView card.contents ] ]
-                ]
-            else if Card.authored connId card then
-                [ Bulma.card
-                    [ Attr.classList
-                        [ ( "not-revealed", not card.revealed )
-                        , ( "can-reveal", True )
-                        ]
-                    , Event.onClick (Reveal columnId cardId)
-                    ]
-                    [ Bulma.cardContent [] [ contentsView card.contents ] ]
-                ]
-            else
-                []
-
-        Retro.Voting ->
-            if card.revealed then
-                [ Bulma.card
-                    (List.concat
-                        [ DragAndDrop.draggable DnD ( columnId, cardId )
-                        , DragAndDrop.dropzone DnD ( columnId, Just cardId )
-                        , [ Attr.classList
-                                [ ( "over", dnd.over == Just ( columnId, Just cardId ) )
-                                , ( "not-revealed", not card.revealed )
-                                ]
-                          ]
-                        ]
-                    )
-                    [ Bulma.cardContent []
-                        [ contentsView card.contents ]
-                    , Bulma.cardFooter []
-                        [ Bulma.cardFooterItem [] (toString card.votes)
-                        , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "+"
-                        , if card.votes > 0 then
-                            Bulma.cardFooterItem [ Event.onClick (Unvote columnId cardId) ] "-"
-                          else
-                            Bulma.cardFooterItem [] "-"
-                        ]
-                    ]
-                ]
-            else
-                []
-
-        Retro.Discussing ->
-            [ Bulma.card []
-                [ Bulma.cardContent [] [ contentsView card.contents ]
-                ]
-            ]
-
-
-titleCardView : String -> Html Msg
-titleCardView title =
-    Html.div [ Attr.class "not-card card-content has-text-centered" ]
-        [ Html.div [ Attr.class "content" ]
-            [ Html.h1 []
-                [ Html.text title
-                ]
-            ]
-        ]
-
-
-addCardView : String -> Html Msg
-addCardView columnId =
-    Bulma.card []
-        [ Bulma.cardContent []
-            [ Bulma.content []
-                [ Html.textarea
-                    [ Event.onInput (ChangeInput columnId)
-                    , ExtraEvent.onEnter (CreateCard columnId)
-                    , Attr.placeholder "Add a card..."
-                    ]
-                    []
+                    Retro.Voting ->
+                        Views.Retro.Voting.view userId model
                 ]
             ]
         ]

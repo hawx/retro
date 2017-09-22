@@ -6,7 +6,7 @@ module Route
         )
 
 import Navigation exposing (Location)
-import UrlParser exposing ((</>), Parser, map, oneOf, parseHash, s, string, top)
+import UrlParser exposing (Parser, map, oneOf, parseHash, string, top)
 
 
 type Route

@@ -1,6 +1,6 @@
 module Data.Retro exposing (..)
 
-import Data.Card as Card exposing (Card, Content)
+import Data.Card exposing (Card, Content)
 import Data.Column as Column exposing (Column)
 import Dict exposing (Dict)
 
