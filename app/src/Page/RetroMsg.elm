@@ -2,6 +2,7 @@ module Page.RetroMsg exposing (Msg(..))
 
 import Data.Retro as Retro
 import DragAndDrop
+import Route exposing (Route)
 
 
 type Msg
@@ -13,3 +14,4 @@ type Msg
     | Vote String String
     | Unvote String String
     | DnD (DragAndDrop.Msg ( String, String ) ( String, Maybe String ))
+    | Navigate Route

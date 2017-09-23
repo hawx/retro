@@ -1,22 +1,18 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
-	"log"
-	"net/http"
-	"os"
-	"sync"
-	"time"
-
+	"github.com/BurntSushi/toml"
 	"github.com/google/uuid"
-
+	"hawx.me/code/retro/auth"
 	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
-
-	"golang.org/x/oauth2"
+	"log"
+	"net/http"
+	"sync"
+	"time"
 )
 
 func strId() string {
@@ -397,16 +393,30 @@ func registerHandlers(r *Room, mux *sock.Server) {
 	})
 }
 
+type config struct {
+	GitHub    gitHubConfig    `toml:"github"`
+	Office365 office365Config `toml:"office365"`
+}
+
+type gitHubConfig struct {
+	ClientID     string `toml:"clientID"`
+	ClientSecret string `toml:"clientSecret"`
+	Organisation string `toml:"organisation"`
+}
+
+type office365Config struct {
+	ClientID     string `toml:"clientID"`
+	ClientSecret string `toml:"clientSecret"`
+	Domain       string `toml:"domain"`
+}
+
 func main() {
 	var (
-		clientID     = os.Getenv("GH_CLIENT_ID")
-		clientSecret = os.Getenv("GH_CLIENT_SECRET")
-		organisation = os.Getenv("ORGANISATION")
-
-		port   = flag.String("port", "8080", "")
-		socket = flag.String("socket", "", "")
-		assets = flag.String("assets", "app/dist", "")
-		dbPath = flag.String("db", "./db", "")
+		configPath = flag.String("config", "config.toml", "")
+		port       = flag.String("port", "8080", "")
+		socket     = flag.String("socket", "", "")
+		assets     = flag.String("assets", "app/dist", "")
+		dbPath     = flag.String("db", "./db", "")
 	)
 	flag.Parse()
 
@@ -418,98 +428,21 @@ func main() {
 
 	room := NewRoom(db)
 
+	conf := config{}
+	if _, err := toml.DecodeFile(*configPath, &conf); err != nil {
+		log.Fatal(err)
+	}
+
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.server)
 
-	ctx := context.Background()
-	conf := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		Scopes:       []string{"user", "read:org"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://github.com/login/oauth/authorize",
-			TokenURL: "https://github.com/login/oauth/access_token",
-		},
-	}
+	gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, conf.GitHub.ClientID, conf.GitHub.ClientSecret, conf.GitHub.Organisation)
+	http.Handle("/oauth/github/login", gitHubLogin)
+	http.Handle("/oauth/github/callback", gitHubCallback)
 
-	http.HandleFunc("/oauth/login", func(w http.ResponseWriter, r *http.Request) {
-		url := conf.AuthCodeURL("state", oauth2.AccessTypeOnline)
-
-		http.Redirect(w, r, url, http.StatusFound)
-	})
-
-	http.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
-		code := r.FormValue("code")
-
-		tok, err := conf.Exchange(ctx, code)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		client := conf.Client(ctx, tok)
-
-		user, err := getUser(client)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		inOrg, err := isInOrg(client, organisation)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if inOrg {
-			token := strId()
-			room.AddUser(user, token)
-
-			http.Redirect(w, r, "/?user="+user+"&token="+token, http.StatusFound)
-		} else {
-			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
-		}
-	})
+	officeLogin, officeCallback := auth.Office365(room.AddUser, conf.Office365.ClientID, conf.Office365.ClientSecret, conf.Office365.Domain)
+	http.Handle("/oauth/office365/login", officeLogin)
+	http.Handle("/oauth/office365/callback", officeCallback)
 
 	serve.Serve(*port, *socket, http.DefaultServeMux)
-}
-
-func getUser(client *http.Client) (string, error) {
-	resp, err := client.Get("https://api.github.com/user")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var data struct {
-		Login string `json:"login"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", err
-	}
-
-	return data.Login, nil
-}
-
-func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
-	resp, err := client.Get("https://api.github.com/user/orgs")
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	var data []struct {
-		Login string `json:"login"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return false, err
-	}
-
-	for _, org := range data {
-		if org.Login == expectedOrg {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }

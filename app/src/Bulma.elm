@@ -97,6 +97,26 @@ title text =
     Html.h1 [ Attr.class "title" ] [ Html.text text ]
 
 
-section : List (Html msg) -> Html msg
-section =
-    Html.section [ Attr.class "section" ]
+subtitle : String -> Html msg
+subtitle text =
+    Html.h2 [ Attr.class "subtitle" ] [ Html.text text ]
+
+
+section : List (Html.Attribute msg) -> List (Html msg) -> Html msg
+section attrs =
+    Html.section (Attr.class "section" :: attrs)
+
+
+level : List (Html msg) -> Html msg
+level =
+    Html.div [ Attr.class "level" ]
+
+
+levelLeft : List (List (Html msg)) -> Html msg
+levelLeft =
+    Html.div [ Attr.class "level-left" ] << List.map (Html.div [ Attr.class "level-item" ])
+
+
+levelRight : List (List (Html msg)) -> Html msg
+levelRight =
+    Html.div [ Attr.class "level-right" ] << List.map (Html.div [ Attr.class "level-item" ])

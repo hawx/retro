@@ -1,4 +1,4 @@
-port module Main exposing (main)
+module Main exposing (main)
 
 import Html exposing (Html)
 import Navigation
@@ -8,11 +8,12 @@ import Page.MenuMsg as Menu
 import Page.Retro as Retro
 import Page.RetroModel as Retro
 import Page.RetroMsg as Retro
+import Page.SignIn as SignIn
+import Port
 import Route exposing (Route)
 import Sock
 import String
 import Views.Footer
-import Views.SignIn
 
 
 main =
@@ -68,21 +69,12 @@ init flags location =
     in
     initModel
         ! [ initCmd
-          , storageGet "id"
+          , Port.storageGet "id"
           ]
 
 
 
 -- Update
-
-
-port storageSet : ( String, String ) -> Cmd msg
-
-
-port storageGet : String -> Cmd msg
-
-
-port storageGot : (Maybe String -> msg) -> Sub msg
 
 
 type Msg
@@ -229,16 +221,10 @@ view : Model -> Html Msg
 view model =
     case model.user of
         Just userId ->
-            Html.div []
-                [ innerView userId model
-                , Views.Footer.view
-                ]
+            innerView userId model
 
         Nothing ->
-            Html.div []
-                [ Views.SignIn.view
-                , Views.Footer.view
-                ]
+            SignIn.view
 
 
 innerView : String -> Model -> Html Msg
@@ -259,5 +245,5 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Sock.listen (webSocketUrl model.flags) Socket
-        , storageGot SetId
+        , Port.storageGot SetId
         ]

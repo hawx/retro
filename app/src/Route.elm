@@ -1,6 +1,7 @@
 module Route
     exposing
         ( Route(..)
+        , navigate
         , parse
         , toUrl
         )
@@ -35,3 +36,8 @@ toUrl r =
 
         Retro retroId ->
             "#/" ++ retroId
+
+
+navigate : Route -> Cmd msg
+navigate route =
+    Navigation.newUrl (toUrl route)

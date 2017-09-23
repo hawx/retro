@@ -9,9 +9,13 @@ module Page.Menu
 
 import Bulma
 import Html exposing (Html)
+import Html.Attributes as Attr
 import Page.MenuModel exposing (..)
 import Page.MenuMsg exposing (..)
+import Port
+import Route
 import Sock
+import Views.Footer
 import Views.Menu.Current
 import Views.Menu.Header
 import Views.Menu.List
@@ -62,6 +66,12 @@ update sender msg model =
         ShowRetroDetails retroId ->
             { model | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList } ! []
 
+        Navigate route ->
+            model ! [ Route.navigate route ]
+
+        SignOut ->
+            model ! [ Port.signOut () ]
+
 
 socketUpdate : ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
 socketUpdate ( _, msgData ) model =
@@ -86,9 +96,9 @@ socketUpdate ( _, msgData ) model =
 
 view : String -> Model -> Html Msg
 view currentUser model =
-    Html.div []
-        [ Views.Menu.Header.view
-        , Bulma.section
+    Html.div [ Attr.class "site-content" ]
+        [ Views.Menu.Header.view currentUser
+        , Bulma.section [ Attr.class "fill-height" ]
             [ Bulma.container
                 [ Bulma.columns []
                     [ Bulma.column []
@@ -104,4 +114,5 @@ view currentUser model =
                     ]
                 ]
             ]
+        , Views.Footer.view
         ]

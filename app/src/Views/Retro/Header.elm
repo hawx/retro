@@ -14,10 +14,15 @@ view current =
     Html.section [ Attr.class "hero is-dark is-bold" ]
         [ Html.div [ Attr.class "hero-body" ]
             [ Bulma.container
-                [ Html.div [ Attr.class "level" ]
-                    [ Bulma.title "Retro"
-                    , Html.a [ Attr.class "button is-outlined is-white", Attr.href (Route.toUrl Route.Menu) ]
-                        [ Html.text "Back" ]
+                [ Bulma.level
+                    [ Bulma.levelLeft
+                        [ [ Bulma.title "Retro" ]
+                        ]
+                    , Bulma.levelRight
+                        [ [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick (Navigate Route.Menu) ]
+                                [ Html.text "Back" ]
+                          ]
+                        ]
                     ]
                 ]
             ]

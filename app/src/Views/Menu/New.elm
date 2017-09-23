@@ -12,11 +12,15 @@ view : String -> Model -> Html Msg
 view currentUser model =
     Html.div []
         [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
-        , Bulma.label "Name"
-        , Bulma.input [ Event.onInput SetRetroName ]
-        , Bulma.label "Participants"
-        , participantsView currentUser model
-        , Html.div [ Attr.class "control is-grouped" ]
+        , Html.div [ Attr.class "field" ]
+            [ Bulma.label "Name"
+            , Bulma.input [ Event.onInput SetRetroName ]
+            ]
+        , Html.div [ Attr.class "field" ]
+            [ Bulma.label "Participants"
+            , Html.div [ Attr.class "tags" ] [ participantsView currentUser model ]
+            ]
+        , Html.div [ Attr.class "field is-grouped" ]
             [ Html.p [ Attr.class "control is-expanded" ]
                 [ Html.input
                     [ Attr.class "input"
@@ -34,9 +38,8 @@ view currentUser model =
                 ]
                 [ Html.text "Add" ]
             ]
-        , Html.div [ Attr.class "level" ]
-            [ Html.div [ Attr.class "level-left" ] []
-            , Html.div [ Attr.class "level-right" ]
+        , Html.div [ Attr.class "field" ]
+            [ Html.div [ Attr.class "control" ]
                 [ Html.button
                     [ Attr.class "button is-primary"
                     , Event.onClick CreateRetro
@@ -62,7 +65,7 @@ participantsView currentUser model =
 
 participantView : String -> Html Msg
 participantView name =
-    Html.span [ Attr.class "tag is-medium" ]
+    Html.span [ Attr.class "tag is-medium is-rounded" ]
         [ Html.text name
         , Html.button
             [ Attr.class "delete is-small"
@@ -82,7 +85,7 @@ participantItem name =
 
 currentUserParticipant : String -> Html msg
 currentUserParticipant currentUser =
-    Html.span [ Attr.class "tag is-medium" ]
+    Html.span [ Attr.class "tag is-medium is-rounded" ]
         [ Html.text currentUser ]
 
 

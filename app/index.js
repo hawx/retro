@@ -24,6 +24,11 @@ app.ports.storageSet.subscribe(function([key, value]) {
   localStorage.setItem(key, value);
 });
 
+app.ports.signOut.subscribe(function() {
+  localStorage.removeItem('id');
+  window.location.reload();
+});
+
 app.ports.storageGet.subscribe(function(key) {
   const value = localStorage.getItem(key);
   app.ports.storageGot.send(value);

@@ -1,5 +1,16 @@
 @import "~bulma";
 
+
+.site-content {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.fill-height {
+  flex: 1;
+}
+
 .content {
   overflow-wrap: break-word;
 }
