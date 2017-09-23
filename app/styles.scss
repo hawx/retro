@@ -19,23 +19,36 @@
   width: 300px;
 }
 
+.card.last-revealed {
+  box-shadow: 0 2px 3px rgba(10, 10, 10, 0.1), 0 0 0 1px rgba(10, 10, 10, 0.1), 0 0 10px rgba(200, 160, 10, .4);
+}
+
 .card.not-revealed {
-  opacity: .5;
+  box-shadow: 0 0 0 1px rgba(10, 10, 10, 0.1);
+  opacity: .8;
+
+  .reverse {
+    font-style: italic;
+    position: absolute;
+    top: 0;
+    opacity: 0;
+    height: 100%;
+    width: 100%;
+    text-align: center;
+    display: flex;
+    justify-content: space-around;
+    flex-direction: column;
+  }
 
   &.can-reveal:hover {
-    opacity: 1;
+    box-shadow: 0 0 0 1px rgba(10, 10, 10, 0.2);
 
-    &::after {
-      content: 'Reveal';
-      color: white;
-      background: rgba(0,0,0,.5);
-      display: block;
-      height: 100%;
-      line-height: 100%;
-      width: 100%;
-      position: absolute;
-      top: 0;
-      text-align: center;
+    .front {
+      opacity: 0;
+    }
+
+    .reverse {
+      opacity: 1;
     }
   }
 }

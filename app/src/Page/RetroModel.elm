@@ -16,4 +16,5 @@ type alias Model =
     { retro : Retro
     , input : String
     , dnd : DragAndDrop.Model CardDragging CardOver
+    , lastRevealed : Maybe String
     }

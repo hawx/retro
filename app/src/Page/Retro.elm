@@ -30,6 +30,7 @@ empty =
     { retro = Retro.empty
     , input = ""
     , dnd = DragAndDrop.empty
+    , lastRevealed = Nothing
     }
 
 
@@ -48,11 +49,11 @@ update sender msg model =
             model ! [ Sock.unvote sender columnId cardId ]
 
         SetStage stage ->
-            { model | retro = Retro.setStage stage model.retro }
+            { model | retro = Retro.setStage stage model.retro, lastRevealed = Nothing }
                 ! [ Sock.stage sender (toString stage) ]
 
         Reveal columnId cardId ->
-            model ! [ Sock.reveal sender columnId cardId ]
+            { model | lastRevealed = Just cardId } ! [ Sock.reveal sender columnId cardId ]
 
         DnD subMsg ->
             case DragAndDrop.isDrop subMsg model.dnd of
@@ -119,7 +120,7 @@ socketUpdate user ( id, msgData ) model =
         Sock.Stage { stage } ->
             case parseStage stage of
                 Just s ->
-                    { model | retro = Retro.setStage s model.retro } ! []
+                    { model | retro = Retro.setStage s model.retro, lastRevealed = Nothing } ! []
 
                 Nothing ->
                     model ! []
@@ -157,7 +158,7 @@ socketUpdate user ( id, msgData ) model =
             { model | retro = Retro.moveCard columnFrom columnTo cardId model.retro } ! []
 
         Sock.Reveal { columnId, cardId } ->
-            { model | retro = Retro.revealCard columnId cardId model.retro } ! []
+            { model | retro = Retro.revealCard columnId cardId model.retro, lastRevealed = Just cardId } ! []
 
         Sock.Group { columnFrom, cardFrom, columnTo, cardTo } ->
             { model | retro = Retro.groupCards ( columnFrom, cardFrom ) ( columnTo, cardTo ) model.retro } ! []
