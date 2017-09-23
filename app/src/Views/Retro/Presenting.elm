@@ -17,31 +17,34 @@ import Views.Retro.TitleCard
 
 view : String -> Model -> Html Msg
 view userId model =
-    columnsView userId model.retro.columns
+    columnsView userId model.lastRevealed model.retro.columns
 
 
-columnsView : String -> Dict String Column -> Html Msg
-columnsView connId columns =
+columnsView : String -> Maybe String -> Dict String Column -> Html Msg
+columnsView connId lastRevealed columns =
     Dict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
-        |> List.map (columnView connId)
+        |> List.map (columnView connId lastRevealed)
         |> Bulma.columns []
 
 
-columnView : String -> ( String, Column ) -> Html Msg
-columnView connId ( columnId, column ) =
+columnView : String -> Maybe String -> ( String, Column ) -> Html Msg
+columnView connId lastRevealed ( columnId, column ) =
     Html.div [ Attr.class "column" ] <|
         Views.Retro.TitleCard.view column.name
             :: (Dict.toList column.cards
-                    |> List.map (cardView connId columnId)
+                    |> List.map (cardView connId columnId lastRevealed)
                )
 
 
-cardView : String -> String -> ( String, Card ) -> Html Msg
-cardView connId columnId ( cardId, card ) =
+cardView : String -> String -> Maybe String -> ( String, Card ) -> Html Msg
+cardView connId columnId lastRevealed ( cardId, card ) =
     if card.revealed then
-        Bulma.card []
-            [ Bulma.cardContent [] [ Views.Retro.Contents.view card.contents ] ]
+        Bulma.card [ Attr.classList [ ( "last-revealed", lastRevealed == Just cardId ) ] ]
+            [ Bulma.cardContent []
+                [ Views.Retro.Contents.view card.contents
+                ]
+            ]
     else if Card.authored connId card then
         Bulma.card
             [ Attr.classList
@@ -50,6 +53,12 @@ cardView connId columnId ( cardId, card ) =
                 ]
             , Event.onClick (Reveal columnId cardId)
             ]
-            [ Bulma.cardContent [] [ Views.Retro.Contents.view card.contents ] ]
+            [ Bulma.cardContent [ Attr.class "front" ]
+                [ Views.Retro.Contents.view card.contents
+                ]
+            , Bulma.cardContent [ Attr.class "reverse" ]
+                [ Html.p [] [ Html.text "Reveal" ]
+                ]
+            ]
     else
         Html.text ""
