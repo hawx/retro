@@ -417,7 +417,8 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.server)
 
-	gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, clientID, clientSecret, organisation)
+	// gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, clientID, clientSecret, organisation)
+	gitHubLogin, gitHubCallback := auth.Office365(room.AddUser, clientID, clientSecret, organisation)
 	http.Handle("/oauth/login", gitHubLogin)
 	http.Handle("/oauth/callback", gitHubCallback)
 
