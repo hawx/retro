@@ -15,7 +15,9 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.RetroModel exposing (..)
 import Page.RetroMsg exposing (Msg(..))
+import Route
 import Sock
+import Views.Footer
 import Views.Retro.Discussing
 import Views.Retro.Header
 import Views.Retro.Presenting
@@ -87,6 +89,9 @@ update sender msg model =
 
         DeleteCard columnId cardId ->
             model ! [ Sock.delete sender columnId cardId ]
+
+        Navigate route ->
+            model ! [ Route.navigate route ]
 
 
 parseStage : String -> Maybe Retro.Stage
@@ -181,9 +186,9 @@ socketUpdate user ( id, msgData ) model =
 
 view : String -> Model -> Html Msg
 view userId model =
-    Html.div []
+    Html.div [ Attr.class "site-content" ]
         [ Views.Retro.Header.view model.retro.stage
-        , Bulma.section
+        , Bulma.section [ Attr.class "fill-height" ]
             [ Html.div [ Attr.class "container is-fluid" ]
                 [ case model.retro.stage of
                     Retro.Discussing ->
@@ -199,4 +204,5 @@ view userId model =
                         Views.Retro.Voting.view userId model
                 ]
             ]
+        , Views.Footer.view
         ]

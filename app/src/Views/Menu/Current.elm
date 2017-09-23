@@ -5,11 +5,13 @@ import Date exposing (Date)
 import Date.Format
 import Html exposing (Html)
 import Html.Attributes as Attr
+import Html.Events as Event
 import Page.MenuModel exposing (Retro)
+import Page.MenuMsg exposing (Msg(Navigate))
 import Route
 
 
-view : Retro -> Html msg
+view : Retro -> Html Msg
 view retro =
     Html.div []
         [ Html.h2 [ Attr.class "title is-4" ]
@@ -21,7 +23,7 @@ view retro =
         , Html.div [ Attr.class "control" ]
             [ Html.a
                 [ Attr.class "button is-primary"
-                , Attr.href (Route.toUrl (Route.Retro retro.id))
+                , Event.onClick (Navigate (Route.Retro retro.id))
                 ]
                 [ Html.text "Open" ]
             ]

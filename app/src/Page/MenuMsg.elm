@@ -1,5 +1,7 @@
 module Page.MenuMsg exposing (Msg(..))
 
+import Route exposing (Route)
+
 
 type Msg
     = CreateRetro
@@ -9,3 +11,5 @@ type Msg
     | DeleteParticipant String
     | SelectParticipant String
     | ShowRetroDetails String
+    | Navigate Route
+    | SignOut
