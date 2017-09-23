@@ -7,8 +7,6 @@ import (
 	"golang.org/x/oauth2"
 	"log"
 	"net/http"
-	"io"
-	"os"
 )
 
 func Office365(addUser func(user, token string), clientID, clientSecret, domain string) (login, callback http.HandlerFunc) {

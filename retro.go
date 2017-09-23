@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"github.com/BurntSushi/toml"
 	"github.com/google/uuid"
 	"hawx.me/code/retro/auth"
 	"hawx.me/code/retro/database"
@@ -10,7 +11,6 @@ import (
 	"hawx.me/code/serve"
 	"log"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 )
@@ -393,16 +393,30 @@ func registerHandlers(r *Room, mux *sock.Server) {
 	})
 }
 
+type config struct {
+	GitHub    gitHubConfig    `toml:"github"`
+	Office365 office365Config `toml:"office365"`
+}
+
+type gitHubConfig struct {
+	ClientID     string `toml:"clientID"`
+	ClientSecret string `toml:"clientSecret"`
+	Organisation string `toml:"organisation"`
+}
+
+type office365Config struct {
+	ClientID     string `toml:"clientID"`
+	ClientSecret string `toml:"clientSecret"`
+	Domain       string `toml:"domain"`
+}
+
 func main() {
 	var (
-		clientID     = os.Getenv("GH_CLIENT_ID")
-		clientSecret = os.Getenv("GH_CLIENT_SECRET")
-		organisation = os.Getenv("ORGANISATION")
-
-		port   = flag.String("port", "8080", "")
-		socket = flag.String("socket", "", "")
-		assets = flag.String("assets", "app/dist", "")
-		dbPath = flag.String("db", "./db", "")
+		configPath = flag.String("config", "config.toml", "")
+		port       = flag.String("port", "8080", "")
+		socket     = flag.String("socket", "", "")
+		assets     = flag.String("assets", "app/dist", "")
+		dbPath     = flag.String("db", "./db", "")
 	)
 	flag.Parse()
 
@@ -414,13 +428,21 @@ func main() {
 
 	room := NewRoom(db)
 
+	conf := config{}
+	if _, err := toml.DecodeFile(*configPath, &conf); err != nil {
+		log.Fatal(err)
+	}
+
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.server)
 
-	// gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, clientID, clientSecret, organisation)
-	gitHubLogin, gitHubCallback := auth.Office365(room.AddUser, clientID, clientSecret, organisation)
-	http.Handle("/oauth/login", gitHubLogin)
-	http.Handle("/oauth/callback", gitHubCallback)
+	gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, conf.GitHub.ClientID, conf.GitHub.ClientSecret, conf.GitHub.Organisation)
+	http.Handle("/oauth/github/login", gitHubLogin)
+	http.Handle("/oauth/github/callback", gitHubCallback)
+
+	officeLogin, officeCallback := auth.Office365(room.AddUser, conf.Office365.ClientID, conf.Office365.ClientSecret, conf.Office365.Domain)
+	http.Handle("/oauth/office365/login", officeLogin)
+	http.Handle("/oauth/office365/callback", officeCallback)
 
 	serve.Serve(*port, *socket, http.DefaultServeMux)
 }
