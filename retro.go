@@ -1,22 +1,18 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"flag"
+	"github.com/google/uuid"
+	"hawx.me/code/retro/auth"
+	"hawx.me/code/retro/database"
+	"hawx.me/code/retro/sock"
+	"hawx.me/code/serve"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
-
-	"hawx.me/code/retro/database"
-	"hawx.me/code/retro/sock"
-	"hawx.me/code/serve"
-
-	"golang.org/x/oauth2"
 )
 
 func strId() string {
@@ -421,95 +417,9 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.server)
 
-	ctx := context.Background()
-	conf := &oauth2.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		Scopes:       []string{"user", "read:org"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  "https://github.com/login/oauth/authorize",
-			TokenURL: "https://github.com/login/oauth/access_token",
-		},
-	}
-
-	http.HandleFunc("/oauth/login", func(w http.ResponseWriter, r *http.Request) {
-		url := conf.AuthCodeURL("state", oauth2.AccessTypeOnline)
-
-		http.Redirect(w, r, url, http.StatusFound)
-	})
-
-	http.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
-		code := r.FormValue("code")
-
-		tok, err := conf.Exchange(ctx, code)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		client := conf.Client(ctx, tok)
-
-		user, err := getUser(client)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		inOrg, err := isInOrg(client, organisation)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		if inOrg {
-			token := strId()
-			room.AddUser(user, token)
-
-			http.Redirect(w, r, "/?user="+user+"&token="+token, http.StatusFound)
-		} else {
-			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
-		}
-	})
+	gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, clientID, clientSecret, organisation)
+	http.Handle("/oauth/login", gitHubLogin)
+	http.Handle("/oauth/callback", gitHubCallback)
 
 	serve.Serve(*port, *socket, http.DefaultServeMux)
-}
-
-func getUser(client *http.Client) (string, error) {
-	resp, err := client.Get("https://api.github.com/user")
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var data struct {
-		Login string `json:"login"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", err
-	}
-
-	return data.Login, nil
-}
-
-func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
-	resp, err := client.Get("https://api.github.com/user/orgs")
-	if err != nil {
-		return false, err
-	}
-	defer resp.Body.Close()
-
-	var data []struct {
-		Login string `json:"login"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return false, err
-	}
-
-	for _, org := range data {
-		if org.Login == expectedOrg {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
