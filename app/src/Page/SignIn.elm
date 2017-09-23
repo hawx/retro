@@ -8,11 +8,12 @@ import Views.Footer
 
 view : Html msg
 view =
-    Html.div []
-        [ Html.section [ Attr.class "hero is-dark is-bold is-large" ]
+    Html.div [ Attr.class "site-content" ]
+        [ Html.section [ Attr.class "hero is-dark is-bold is-large fill-height" ]
             [ Html.div [ Attr.class "hero-body" ]
                 [ Bulma.container
                     [ Bulma.title "Retro"
+                    , Bulma.subtitle "For running retrospectives remotely"
                     , Html.div [ Attr.class "field is-grouped" ]
                         [ Html.p [ Attr.class "control" ]
                             [ Html.a
@@ -23,7 +24,7 @@ view =
                             ]
                         , Html.p [ Attr.class "control" ]
                             [ Html.a
-                                [ Attr.class "button is-primary is-outlined"
+                                [ Attr.class "button is-danger is-outlined"
                                 , Attr.href "/oauth/office365/login"
                                 ]
                                 [ Html.text "Sign-in with Office365" ]

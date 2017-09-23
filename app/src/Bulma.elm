@@ -97,6 +97,11 @@ title text =
     Html.h1 [ Attr.class "title" ] [ Html.text text ]
 
 
+subtitle : String -> Html msg
+subtitle text =
+    Html.h2 [ Attr.class "subtitle" ] [ Html.text text ]
+
+
 section : List (Html.Attribute msg) -> List (Html msg) -> Html msg
 section attrs =
     Html.section (Attr.class "section" :: attrs)
