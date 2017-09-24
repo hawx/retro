@@ -117,6 +117,9 @@ parseStage s =
 socketUpdate : Maybe String -> ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
 socketUpdate user ( id, msgData ) model =
     case msgData of
+        Sock.Leader { leader } ->
+            { model | retro = Retro.setLeader leader model.retro } ! []
+
         Sock.Stage { stage } ->
             case parseStage stage of
                 Just s ->
@@ -188,7 +191,7 @@ socketUpdate user ( id, msgData ) model =
 view : String -> Model -> Html Msg
 view userId model =
     Html.div [ Attr.class "site-content" ]
-        [ Views.Retro.Header.view model.retro.stage
+        [ Views.Retro.Header.view userId model.retro.leader model.retro.stage
         , Bulma.section [ Attr.class "fill-height" ]
             [ Html.div [ Attr.class "container is-fluid" ]
                 [ case model.retro.stage of
@@ -202,7 +205,7 @@ view userId model =
                         Views.Retro.Presenting.view userId model
 
                     Retro.Voting ->
-                        Views.Retro.Voting.view userId model
+                        Views.Retro.Voting.view userId model.retro.leader model
                 ]
             ]
         , Views.Footer.view

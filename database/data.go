@@ -32,7 +32,9 @@ func (d *Database) setup() error {
       Id        TEXT PRIMARY KEY,
       Name      TEXT,
       Stage     TEXT,
-      CreatedAt DATETIME
+      Leader    TEXT,
+      CreatedAt DATETIME,
+      FOREIGN KEY(Leader) REFERENCES users(Username)
     );
 
     CREATE TABLE IF NOT EXISTS participants (

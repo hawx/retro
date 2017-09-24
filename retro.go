@@ -34,6 +34,10 @@ type stageData struct {
 	Stage string `json:"stage"`
 }
 
+type leaderData struct {
+	Leader string `json:"leader"`
+}
+
 type columnData struct {
 	ColumnId    string `json:"columnId"`
 	ColumnName  string `json:"columnName"`
@@ -90,6 +94,7 @@ type userData struct {
 type retroData struct {
 	Id           string    `json:"id"`
 	Name         string    `json:"name"`
+	Leader       string    `json:"leader"`
 	CreatedAt    time.Time `json:"createdAt"`
 	Participants []string  `json:"participants"`
 }
@@ -154,6 +159,9 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		}
 		conn.RetroId = args.RetroId
 
+		if retro.Leader != "" {
+			conn.Send("", "leader", leaderData{retro.Leader})
+		}
 		if retro.Stage != "" {
 			conn.Send("", "stage", stageData{retro.Stage})
 		}
@@ -203,7 +211,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 				continue
 			}
 
-			conn.Send("", "retro", retroData{retro.Id, retro.Name, retro.CreatedAt, participants})
+			conn.Send("", "retro", retroData{retro.Id, retro.Name, retro.Leader, retro.CreatedAt, participants})
 		}
 	})
 
@@ -344,6 +352,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		r.db.AddRetro(database.Retro{
 			Id:        retroId,
 			Name:      args.Name,
+			Leader:    conn.Name,
 			Stage:     "",
 			CreatedAt: createdAt,
 		})
@@ -389,7 +398,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 			r.db.AddParticipant(retroId, user)
 		}
 
-		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, createdAt, allParticipants})
+		conn.Send(conn.Name, "retro", retroData{retroId, args.Name, conn.Name, createdAt, allParticipants})
 	})
 }
 

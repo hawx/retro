@@ -33,6 +33,7 @@ import Sock.LowLevel
 type MsgData
     = Error ErrorData
     | Stage StageData
+    | Leader LeaderData
     | Column ColumnData
     | Card CardData
     | Content ContentData
@@ -64,6 +65,16 @@ stageDecoder : Decode.Decoder StageData
 stageDecoder =
     Pipeline.decode StageData
         |> Pipeline.required "stage" Decode.string
+
+
+type alias LeaderData =
+    { leader : String }
+
+
+leaderDecoder : Decode.Decoder LeaderData
+leaderDecoder =
+    Pipeline.decode LeaderData
+        |> Pipeline.required "leader" Decode.string
 
 
 type alias ColumnData =
@@ -201,6 +212,7 @@ userDecoder =
 type alias RetroData =
     { id : String
     , name : String
+    , leader : String
     , createdAt : Date
     , participants : List String
     }
@@ -211,6 +223,7 @@ retroDecoder =
     Pipeline.decode RetroData
         |> Pipeline.required "id" Decode.string
         |> Pipeline.required "name" Decode.string
+        |> Pipeline.required "leader" Decode.string
         |> Pipeline.required "createdAt" decodeDate
         |> Pipeline.required "participants" (Decode.list Decode.string)
 
@@ -234,6 +247,7 @@ update data model f =
         mux =
             Dict.fromList
                 [ ( "stage", runOp stageDecoder Stage )
+                , ( "leader", runOp leaderDecoder Leader )
                 , ( "card", runOp cardDecoder Card )
                 , ( "content", runOp contentDecoder Content )
                 , ( "column", runOp columnDecoder Column )

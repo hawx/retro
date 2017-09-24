@@ -21,7 +21,7 @@ view retro =
         , Html.div [ Attr.class "field" ]
             [ Html.div [ Attr.class "control" ]
                 [ Html.div [ Attr.class "tags" ]
-                    (List.map (Html.text >> List.singleton >> Html.span [ Attr.class "tag is-medium is-rounded" ]) retro.participants)
+                    (List.map (participantView retro.leader) retro.participants)
                 ]
             ]
         , Html.div [ Attr.class "field" ]
@@ -34,6 +34,15 @@ view retro =
                 ]
             ]
         ]
+
+
+participantView : String -> String -> Html msg
+participantView leader participant =
+    Html.span
+        [ Attr.class "tag is-medium is-rounded"
+        , Attr.classList [ ( "is-info", leader == participant ) ]
+        ]
+        [ Html.text participant ]
 
 
 formatDate : Date -> String
