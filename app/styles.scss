@@ -16,7 +16,8 @@
 }
 
 .card, .not-card {
-  width: 300px;
+  min-width: 300px;
+  max-width: 500px;
 }
 
 .card.last-revealed {
