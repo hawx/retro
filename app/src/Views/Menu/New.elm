@@ -25,13 +25,11 @@ view currentUser model =
                 [ Html.input
                     [ Attr.class "input"
                     , Event.onInput SetParticipant
+                    , Attr.list "participant-suggestions"
                     ]
                     []
                 ]
-            , if model.participant == "" || acceptablePeople currentUser model == [] then
-                Html.text ""
-              else
-                participantSuggestions currentUser model
+            , participantSuggestions currentUser model
             , Html.button
                 [ Attr.class "button is-info"
                 , Event.onClick AddParticipant
@@ -52,9 +50,11 @@ view currentUser model =
 
 
 participantSuggestions : String -> Model -> Html Msg
-participantSuggestions currentUser model =
-    List.map participantItem (acceptablePeople currentUser model)
-        |> Html.ul [ Attr.class "autocomplete-list" ]
+participantSuggestions currentUser { participant, participants, possibleParticipants } =
+    possibleParticipants
+        |> List.filter (\x -> not (List.member x participants) && x /= currentUser && String.contains (String.toLower participant) (String.toLower x))
+        |> List.map (\name -> Html.option [ Attr.value name ] [])
+        |> Html.datalist [ Attr.id "participant-suggestions" ]
 
 
 participantsView : String -> Model -> Html Msg
@@ -67,19 +67,7 @@ participantView : String -> Html Msg
 participantView name =
     Html.span [ Attr.class "tag is-medium is-rounded" ]
         [ Html.text name
-        , Html.button
-            [ Attr.class "delete is-small"
-            , Event.onClick (DeleteParticipant name)
-            ]
-            []
-        ]
-
-
-participantItem : String -> Html Msg
-participantItem name =
-    Html.li []
-        [ Html.a [ Event.onClick (SelectParticipant name) ]
-            [ Html.text name ]
+        , Html.button [ Attr.class "delete is-small", Event.onClick (DeleteParticipant name) ] []
         ]
 
 
@@ -87,11 +75,3 @@ currentUserParticipant : String -> Html msg
 currentUserParticipant currentUser =
     Html.span [ Attr.class "tag is-medium is-rounded" ]
         [ Html.text currentUser ]
-
-
-acceptablePeople : String -> Model -> List String
-acceptablePeople currentUser { participant, participants, possibleParticipants } =
-    possibleParticipants
-        |> List.filter (\x -> not (List.member x participants))
-        |> List.filter ((/=) currentUser)
-        |> List.filter (String.contains (String.toLower participant) << String.toLower)
