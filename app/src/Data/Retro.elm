@@ -15,6 +15,7 @@ type Stage
 type alias Retro =
     { columns : Dict String Column
     , stage : Stage
+    , leader : Maybe String
     }
 
 
@@ -22,12 +23,18 @@ empty : Retro
 empty =
     { columns = Dict.empty
     , stage = Thinking
+    , leader = Nothing
     }
 
 
 setStage : Stage -> Retro -> Retro
 setStage stage retro =
     { retro | stage = stage }
+
+
+setLeader : String -> Retro -> Retro
+setLeader leader retro =
+    { retro | leader = Just leader }
 
 
 getCard : String -> String -> Retro -> Maybe Card

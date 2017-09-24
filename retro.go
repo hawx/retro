@@ -34,6 +34,10 @@ type stageData struct {
 	Stage string `json:"stage"`
 }
 
+type leaderData struct {
+	Leader string `json:"leader"`
+}
+
 type columnData struct {
 	ColumnId    string `json:"columnId"`
 	ColumnName  string `json:"columnName"`
@@ -155,6 +159,9 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		}
 		conn.RetroId = args.RetroId
 
+		if retro.Leader != "" {
+			conn.Send("", "leader", leaderData{retro.Leader})
+		}
 		if retro.Stage != "" {
 			conn.Send("", "stage", stageData{retro.Stage})
 		}

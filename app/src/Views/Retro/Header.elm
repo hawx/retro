@@ -9,8 +9,8 @@ import Page.RetroMsg exposing (Msg(..))
 import Route
 
 
-view : Retro.Stage -> Html Msg
-view current =
+view : String -> Maybe String -> Retro.Stage -> Html Msg
+view userId leader current =
     Html.section [ Attr.class "hero is-dark is-bold" ]
         [ Html.div [ Attr.class "hero-body" ]
             [ Bulma.container
@@ -19,7 +19,13 @@ view current =
                         [ [ Bulma.title "Retro" ]
                         ]
                     , Bulma.levelRight
-                        [ [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick (Navigate Route.Menu) ]
+                        [ [ Html.span [] [ Html.text userId ]
+                          , if leader == Just userId then
+                                Html.span [] [ Html.text " (Leader)" ]
+                            else
+                                Html.text ""
+                          ]
+                        , [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick (Navigate Route.Menu) ]
                                 [ Html.text "Back" ]
                           ]
                         ]
@@ -30,10 +36,10 @@ view current =
             [ Bulma.container
                 [ Bulma.tabs [ Attr.class "is-boxed is-fullwidth" ]
                     [ Html.ul []
-                        [ tab current Retro.Thinking
-                        , tab current Retro.Presenting
-                        , tab current Retro.Voting
-                        , tab current Retro.Discussing
+                        [ tab (leader == Just userId) current Retro.Thinking
+                        , tab (leader == Just userId) current Retro.Presenting
+                        , tab (leader == Just userId) current Retro.Voting
+                        , tab (leader == Just userId) current Retro.Discussing
                         ]
                     ]
                 ]
@@ -41,11 +47,15 @@ view current =
         ]
 
 
-tab : Retro.Stage -> Retro.Stage -> Html Msg
-tab current stage =
+tab : Bool -> Retro.Stage -> Retro.Stage -> Html Msg
+tab isLeader current stage =
     Html.li
-        [ Attr.classList [ ( "is-active", current == stage ) ]
-        , Event.onClick (SetStage stage)
-        ]
+        (if isLeader then
+            [ Attr.classList [ ( "is-active", current == stage ) ]
+            , Event.onClick (SetStage stage)
+            ]
+         else
+            [ Attr.classList [ ( "is-active", current == stage ) ] ]
+        )
         [ Html.a [] [ Html.text (toString stage) ]
         ]
