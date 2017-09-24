@@ -6,32 +6,34 @@ type Retro struct {
 	Id        string
 	Name      string
 	Stage     string
+	Leader string
 	CreatedAt time.Time
 }
 
 func (d *Database) AddRetro(retro Retro) error {
-	_, err := d.db.Exec("INSERT INTO retros(Id, Name, Stage, CreatedAt) VALUES (?, ?, ?, ?)",
+	_, err := d.db.Exec("INSERT INTO retros(Id, Name, Stage, Leader, CreatedAt) VALUES (?, ?, ?, ?, ?)",
 		retro.Id,
 		retro.Name,
 		retro.Stage,
+		retro.Leader,
 		retro.CreatedAt)
 
 	return err
 }
 
 func (d *Database) GetRetro(id string) (Retro, error) {
-	row := d.db.QueryRow("SELECT Id, Name, Stage, CreatedAt FROM retros WHERE Id=?",
+	row := d.db.QueryRow("SELECT Id, Name, Stage, Leader, CreatedAt FROM retros WHERE Id=?",
 		id)
 
 	var retro Retro
-	err := row.Scan(&retro.Id, &retro.Name, &retro.Stage, &retro.CreatedAt)
+	err := row.Scan(&retro.Id, &retro.Name, &retro.Stage, &retro.Leader, &retro.CreatedAt)
 
 	return retro, err
 }
 
 func (d *Database) GetRetros(username string) (retros []Retro, err error) {
 	rows, err := d.db.Query(`
-    SELECT retros.Id, retros.Name, retros.Stage, retros.CreatedAt
+    SELECT retros.Id, retros.Name, retros.Stage, retros.Leader, retros.CreatedAt
     FROM retros
     INNER JOIN participants
       ON retros.Id = participants.Retro
@@ -45,7 +47,7 @@ func (d *Database) GetRetros(username string) (retros []Retro, err error) {
 
 	for rows.Next() {
 		var retro Retro
-		if err = rows.Scan(&retro.Id, &retro.Name, &retro.Stage, &retro.CreatedAt); err != nil {
+		if err = rows.Scan(&retro.Id, &retro.Name, &retro.Stage, &retro.Leader, &retro.CreatedAt); err != nil {
 			return retros, err
 		}
 		retros = append(retros, retro)

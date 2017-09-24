@@ -79,10 +79,10 @@ socketUpdate ( _, msgData ) model =
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []
 
-        Sock.Retro { id, name, createdAt, participants } ->
+        Sock.Retro { id, name, leader, createdAt, participants } ->
             let
                 newRetro =
-                    Retro id name createdAt participants
+                    Retro id name leader createdAt participants
             in
             { model
                 | retroList = newRetro :: model.retroList

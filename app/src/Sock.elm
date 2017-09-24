@@ -201,6 +201,7 @@ userDecoder =
 type alias RetroData =
     { id : String
     , name : String
+    , leader : String
     , createdAt : Date
     , participants : List String
     }
@@ -211,6 +212,7 @@ retroDecoder =
     Pipeline.decode RetroData
         |> Pipeline.required "id" Decode.string
         |> Pipeline.required "name" Decode.string
+        |> Pipeline.required "leader" Decode.string
         |> Pipeline.required "createdAt" decodeDate
         |> Pipeline.required "participants" (Decode.list Decode.string)
 
