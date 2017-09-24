@@ -205,7 +205,7 @@ view userId model =
                         Views.Retro.Presenting.view userId model
 
                     Retro.Voting ->
-                        Views.Retro.Voting.view userId model
+                        Views.Retro.Voting.view userId model.retro.leader model
                 ]
             ]
         , Views.Footer.view

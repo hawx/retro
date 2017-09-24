@@ -19,11 +19,12 @@ view userId leader current =
                         [ [ Bulma.title "Retro" ]
                         ]
                     , Bulma.levelRight
-                        [ [ Html.span [] [ Html.text userId ]
-                          , if leader == Just userId then
-                                Html.span [] [ Html.text " (Leader)" ]
-                            else
-                                Html.text ""
+                        [ [ Html.span
+                                [ Attr.class "tag is-rounded is-medium"
+                                , Attr.classList [ ( "is-info", leader == Just userId ) ]
+                                ]
+                                [ Html.text userId
+                                ]
                           ]
                         , [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick (Navigate Route.Menu) ]
                                 [ Html.text "Back" ]

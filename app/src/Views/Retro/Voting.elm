@@ -15,52 +15,56 @@ import Views.Retro.Contents
 import Views.Retro.TitleCard
 
 
-view : String -> Model -> Html Msg
-view userId model =
-    columnsView model.dnd model.retro.columns
+view : String -> Maybe String -> Model -> Html Msg
+view userId leader model =
+    columnsView (Just userId == leader) model.dnd model.retro.columns
 
 
-columnsView : DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
-columnsView dnd columns =
+columnsView : Bool -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
+columnsView isLeader dnd columns =
     Dict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
-        |> List.map (columnView dnd)
+        |> List.map (columnView isLeader dnd)
         |> Bulma.columns []
 
 
-columnView : DragAndDrop.Model CardDragging CardOver -> ( String, Column ) -> Html Msg
-columnView dnd ( columnId, column ) =
+columnView : Bool -> DragAndDrop.Model CardDragging CardOver -> ( String, Column ) -> Html Msg
+columnView isLeader dnd ( columnId, column ) =
     Html.div [ Attr.class "column" ] <|
         Views.Retro.TitleCard.view column.name
             :: (Dict.toList column.cards
-                    |> List.map (cardView dnd columnId)
+                    |> List.filter (Tuple.second >> .revealed)
+                    |> List.map (cardView isLeader dnd columnId)
                )
 
 
-cardView : DragAndDrop.Model CardDragging CardOver -> String -> ( String, Card ) -> Html Msg
-cardView dnd columnId ( cardId, card ) =
-    if card.revealed then
-        Bulma.card
-            (List.concat
-                [ DragAndDrop.draggable DnD ( columnId, cardId )
-                , DragAndDrop.dropzone DnD ( columnId, Just cardId )
-                , [ Attr.classList
-                        [ ( "over", dnd.over == Just ( columnId, Just cardId ) )
-                        , ( "not-revealed", not card.revealed )
-                        ]
-                  ]
-                ]
-            )
-            [ Bulma.cardContent []
-                [ Views.Retro.Contents.view card.contents ]
-            , Bulma.cardFooter []
-                [ Bulma.cardFooterItem [] (toString card.votes)
-                , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "+"
-                , if card.votes > 0 then
-                    Bulma.cardFooterItem [ Event.onClick (Unvote columnId cardId) ] "-"
-                  else
-                    Bulma.cardFooterItem [] "-"
-                ]
+cardView : Bool -> DragAndDrop.Model CardDragging CardOver -> String -> ( String, Card ) -> Html Msg
+cardView isLeader dnd columnId ( cardId, card ) =
+    Bulma.card
+        (List.concat
+            [ if isLeader then
+                DragAndDrop.draggable DnD ( columnId, cardId )
+              else
+                []
+            , if isLeader then
+                DragAndDrop.dropzone DnD ( columnId, Just cardId )
+              else
+                []
+            , [ Attr.classList
+                    [ ( "over", dnd.over == Just ( columnId, Just cardId ) )
+                    , ( "not-revealed", not card.revealed )
+                    ]
+              ]
             ]
-    else
-        Html.text ""
+        )
+        [ Bulma.cardContent []
+            [ Views.Retro.Contents.view card.contents ]
+        , Bulma.cardFooter []
+            [ Bulma.cardFooterItem [] (toString card.votes)
+            , Bulma.cardFooterItem [ Event.onClick (Vote columnId cardId) ] "+"
+            , if card.votes > 0 then
+                Bulma.cardFooterItem [ Event.onClick (Unvote columnId cardId) ] "-"
+              else
+                Bulma.cardFooterItem [] "-"
+            ]
+        ]

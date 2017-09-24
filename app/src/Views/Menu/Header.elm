@@ -17,7 +17,7 @@ view currentUser =
                         [ [ Bulma.title "Retro" ]
                         ]
                     , Bulma.levelRight
-                        [ [ Html.span []
+                        [ [ Html.span [ Attr.class "tag is-rounded is-medium" ]
                                 [ Html.text currentUser ]
                           ]
                         , [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick SignOut ]
