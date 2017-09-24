@@ -118,6 +118,7 @@ groupCards ( columnFrom, cardFrom ) ( columnTo, cardTo ) retro =
                 Just a ->
                     { b
                         | votes = a.votes + b.votes
+                        , totalVotes = a.totalVotes + b.totalVotes
                         , revealed = a.revealed || b.revealed
                         , contents = List.concat [ a.contents, b.contents ]
                     }
