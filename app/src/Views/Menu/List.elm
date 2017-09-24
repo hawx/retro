@@ -9,11 +9,11 @@ import Page.MenuMsg exposing (..)
 
 view : Model -> Html Msg
 view model =
-    Html.div []
-        [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Your Retros" ]
-        , Html.div [ Attr.class "menu" ]
-            [ Html.ul [ Attr.class "menu-list" ] (List.map (choice model.currentChoice) model.retroList)
-            ]
+    Html.div [ Attr.class "menu" ]
+        [ Html.p [ Attr.class "menu-label" ]
+            [ Html.text "Your Retros" ]
+        , Html.ul [ Attr.class "menu-list" ]
+            (List.map (choice model.currentChoice) model.retroList)
         ]
 
 

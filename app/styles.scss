@@ -16,7 +16,8 @@
 }
 
 .card, .not-card {
-  width: 300px;
+  min-width: 300px;
+  max-width: 500px;
 }
 
 .card.last-revealed {
@@ -87,14 +88,4 @@
 .card .delete {
   float: right;
   margin: .5rem;
-}
-
-.autocomplete-list {
-  position: absolute;
-  top: 3rem;
-  left: 0;
-  background: white;
-  box-shadow: 0 0 2px rgba(0,0,0,.3);
-  border-radius: 3px;
-  padding: .5rem 1rem;
 }
