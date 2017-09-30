@@ -189,7 +189,7 @@ view : String -> Model -> Html Msg
 view userId model =
     Html.div [ Attr.class "site-content" ]
         [ Views.Retro.Header.view model.retro.stage
-        , Bulma.section [ Attr.class "fill-height" ]
+        , Bulma.section [ Attr.class "fill-height x-auto-scroll" ]
             [ Html.div [ Attr.class "container is-fluid" ]
                 [ case model.retro.stage of
                     Retro.Discussing ->
