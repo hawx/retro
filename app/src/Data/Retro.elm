@@ -80,7 +80,7 @@ updateCard columnId cardId f =
         updateHelp column =
             Column.updateCard cardId f column
     in
-    updateColumn columnId updateHelp
+        updateColumn columnId updateHelp
 
 
 revealCard : String -> String -> Retro -> Retro
@@ -100,7 +100,17 @@ totalVoteCard count columnId cardId =
 
 addContent : String -> String -> Content -> Retro -> Retro
 addContent columnId cardId content =
-    updateCard columnId cardId (\card -> { card | contents = card.contents ++ [ content ] })
+    let
+        alreadyContainsContent contents = 
+            List.any (\x -> x.id == content.id ) contents
+
+        contents c =
+            if alreadyContainsContent c.contents then
+                List.map (\x -> if x.id == content.id then { x | text = content.text} else x ) c.contents
+            else
+                c.contents ++ [ content ]
+    in
+        updateCard columnId cardId (\card -> { card | contents = contents card })
 
 
 groupCards : ( String, String ) -> ( String, String ) -> Retro -> Retro
@@ -121,3 +131,7 @@ groupCards ( columnFrom, cardFrom ) ( columnTo, cardTo ) retro =
     retro
         |> removeCard columnFrom cardFrom
         |> updateCard columnTo cardTo updateHelp
+
+editingCard: String -> String -> Bool -> Retro -> Retro
+editingCard columnId cardId editing = 
+    updateCard columnId cardId (\card -> { card | editing = editing }) 

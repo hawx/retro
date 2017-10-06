@@ -8,7 +8,9 @@ import Route exposing (Route)
 type Msg
     = ChangeInput String String
     | CreateCard String
+    | UpdateCard String String String 
     | DeleteCard String String
+    | EditCard String String
     | SetStage Retro.Stage
     | Reveal String String
     | Vote String String

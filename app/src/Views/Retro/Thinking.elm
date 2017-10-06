@@ -13,6 +13,7 @@ import Html.Events.Extra as ExtraEvent
 import Page.RetroModel exposing (..)
 import Page.RetroMsg exposing (Msg(..))
 import Views.Retro.Contents
+import Views.Retro.EditContents
 import Views.Retro.TitleCard
 
 
@@ -52,10 +53,16 @@ columnView connId stage dnd ( columnId, column ) =
 cardView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> ( String, Card ) -> Html Msg
 cardView connId stage dnd columnId ( cardId, card ) =
     if Card.authored connId card then
-        Bulma.card (DragAndDrop.draggable DnD ( columnId, cardId ))
-            [ Bulma.delete [ Event.onClick (DeleteCard columnId cardId) ]
-            , Bulma.cardContent [] [ Views.Retro.Contents.view card.contents ]
-            ]
+        if not card.editing then
+            Bulma.card (DragAndDrop.draggable DnD ( columnId, cardId ))
+                [ Bulma.delete [ Event.onClick (DeleteCard columnId cardId) ]
+                , Bulma.cardContent [ Event.onDoubleClick (EditCard columnId cardId) ] [ Views.Retro.Contents.view card.contents ]
+                ]
+        else
+            Bulma.card []
+                [ Bulma.cardContent [] 
+                    [ Views.Retro.EditContents.view columnId card]
+                ]
     else
         Html.text ""
 
@@ -63,7 +70,7 @@ cardView connId stage dnd columnId ( cardId, card ) =
 addCardView : String -> Html Msg
 addCardView columnId =
     Bulma.card []
-        [ Bulma.cardContent []
+        [ Bulma.cardContent []      
             [ Bulma.content []
                 [ Html.textarea
                     [ Event.onInput (ChangeInput columnId)

@@ -17,6 +17,14 @@ func (d *Database) AddContent(content Content) error {
 	return err
 }
 
+func (d *Database) UpdateContent(content Content) error { 
+	_, err := d.db.Exec("UPDATE contents SET Text=? WHERE Id=?",
+		content.Text,
+		content.Id)
+
+	return err	
+}
+
 func (d *Database) GetContent(id string) (Content, error) {
 	row := d.db.QueryRow("SELECT Id, Card, Text, Author FROM contents WHERE Id=?",
 		id)
