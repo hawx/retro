@@ -17,10 +17,10 @@ func (d *Database) AddContent(content Content) error {
 	return err
 }
 
-func (d *Database) UpdateContent(content Content) error { 
+func (d *Database) UpdateContent(id string, text string) error { 
 	_, err := d.db.Exec("UPDATE contents SET Text=? WHERE Id=?",
-		content.Text,
-		content.Id)
+		text,
+		id)
 
 	return err	
 }
