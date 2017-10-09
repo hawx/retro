@@ -2,10 +2,11 @@ module Views.Retro.Thinking exposing (view)
 
 import Bulma
 import Data.Card as Card exposing (Card)
-import Data.Column exposing (Column)
+import Data.Column as Column exposing (Column)
 import Data.Retro as Retro
 import Dict exposing (Dict)
 import DragAndDrop
+import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
@@ -22,22 +23,22 @@ view userId model =
     columnsView userId model.retro.stage model.dnd model.retro.columns
 
 
-columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
+columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> EveryDict Column.Id Column -> Html Msg
 columnsView connId stage dnd columns =
-    Dict.toList columns
+    EveryDict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
         |> List.map (columnView connId stage dnd)
         |> Bulma.columns []
 
 
-columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> ( String, Column ) -> Html Msg
+columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> ( Column.Id, Column ) -> Html Msg
 columnView connId stage dnd ( columnId, column ) =
     let
         title =
             [ Views.Retro.TitleCard.view column.name ]
 
         list =
-            Dict.toList column.cards
+            EveryDict.toList column.cards
                 |> List.map (cardView connId stage dnd columnId)
 
         add =
@@ -50,7 +51,7 @@ columnView connId stage dnd ( columnId, column ) =
         (title ++ list ++ add)
 
 
-cardView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> ( String, Card ) -> Html Msg
+cardView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> Column.Id -> ( Card.Id, Card ) -> Html Msg
 cardView connId stage dnd columnId ( cardId, card ) =
     if Card.authored connId card then
         if not card.editing then
@@ -60,17 +61,17 @@ cardView connId stage dnd columnId ( cardId, card ) =
                 ]
         else
             Bulma.card []
-                [ Bulma.cardContent [] 
-                    [ Views.Retro.EditContents.view columnId card]
+                [ Bulma.cardContent []
+                    [ Views.Retro.EditContents.view columnId card ]
                 ]
     else
         Html.text ""
 
 
-addCardView : String -> Html Msg
+addCardView : Column.Id -> Html Msg
 addCardView columnId =
     Bulma.card []
-        [ Bulma.cardContent []      
+        [ Bulma.cardContent []
             [ Bulma.content []
                 [ Html.textarea
                     [ Event.onInput (ChangeInput columnId)

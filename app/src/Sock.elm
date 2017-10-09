@@ -23,6 +23,9 @@ module Sock
 purposes of retro.
 -}
 
+import Data.Card as Card
+import Data.Column as Column
+import Data.Content as Content
 import Date exposing (Date)
 import Dict
 import Json.Decode as Decode
@@ -68,7 +71,7 @@ stageDecoder =
 
 
 type alias ColumnData =
-    { columnId : String
+    { columnId : Column.Id
     , columnName : String
     , columnOrder : Int
     }
@@ -77,14 +80,14 @@ type alias ColumnData =
 columnDecoder : Decode.Decoder ColumnData
 columnDecoder =
     Pipeline.decode ColumnData
-        |> Pipeline.required "columnId" Decode.string
+        |> Pipeline.required "columnId" Column.decodeId
         |> Pipeline.required "columnName" Decode.string
         |> Pipeline.required "columnOrder" Decode.int
 
 
 type alias CardData =
-    { columnId : String
-    , cardId : String
+    { columnId : Column.Id
+    , cardId : Card.Id
     , revealed : Bool
     , votes : Int
     , totalVotes : Int
@@ -94,79 +97,79 @@ type alias CardData =
 cardDecoder : Decode.Decoder CardData
 cardDecoder =
     Pipeline.decode CardData
-        |> Pipeline.required "columnId" Decode.string
-        |> Pipeline.required "cardId" Decode.string
+        |> Pipeline.required "columnId" Column.decodeId
+        |> Pipeline.required "cardId" Card.decodeId
         |> Pipeline.required "revealed" Decode.bool
         |> Pipeline.required "votes" Decode.int
         |> Pipeline.required "totalVotes" Decode.int
 
 
 type alias ContentData =
-    { columnId : String
-    , cardId : String
+    { columnId : Column.Id
+    , cardId : Card.Id
+    , contentId : Content.Id
     , cardText : String
-    , contentId: String
     }
 
 
 contentDecoder : Decode.Decoder ContentData
 contentDecoder =
     Pipeline.decode ContentData
-        |> Pipeline.required "columnId" Decode.string
-        |> Pipeline.required "cardId" Decode.string
+        |> Pipeline.required "columnId" Column.decodeId
+        |> Pipeline.required "cardId" Card.decodeId
+        |> Pipeline.required "contentId" Content.decodeId
         |> Pipeline.required "cardText" Decode.string
-        |> Pipeline.required "contentId" Decode.string
 
 
 type alias MoveData =
-    { columnFrom : String
-    , columnTo : String
-    , cardId : String
+    { columnFrom : Column.Id
+    , columnTo : Column.Id
+    , cardId : Card.Id
     }
 
 
 moveDecoder : Decode.Decoder MoveData
 moveDecoder =
     Pipeline.decode MoveData
-        |> Pipeline.required "columnFrom" Decode.string
-        |> Pipeline.required "columnTo" Decode.string
-        |> Pipeline.required "cardId" Decode.string
+        |> Pipeline.required "columnFrom" Column.decodeId
+        |> Pipeline.required "columnTo" Column.decodeId
+        |> Pipeline.required "cardId" Card.decodeId
 
 
 type alias RevealData =
-    { columnId : String
-    , cardId : String
+    { columnId : Column.Id
+    , cardId : Card.Id
     }
 
 
 revealDecoder : Decode.Decoder RevealData
 revealDecoder =
     Pipeline.decode RevealData
-        |> Pipeline.required "columnId" Decode.string
-        |> Pipeline.required "cardId" Decode.string
+        |> Pipeline.required "columnId" Column.decodeId
+        |> Pipeline.required "cardId" Card.decodeId
 
 
 type alias GroupData =
-    { columnFrom : String
-    , cardFrom : String
-    , columnTo : String
-    , cardTo : String
+    { columnFrom : Column.Id
+    , cardFrom : Card.Id
+    , columnTo : Column.Id
+    , cardTo : Card.Id
     }
 
 
 groupDecoder : Decode.Decoder GroupData
 groupDecoder =
     Pipeline.decode GroupData
-        |> Pipeline.required "columnFrom" Decode.string
-        |> Pipeline.required "cardFrom" Decode.string
-        |> Pipeline.required "columnTo" Decode.string
-        |> Pipeline.required "cardTo" Decode.string
+        |> Pipeline.required "columnFrom" Column.decodeId
+        |> Pipeline.required "cardFrom" Card.decodeId
+        |> Pipeline.required "columnTo" Column.decodeId
+        |> Pipeline.required "cardTo" Card.decodeId
 
 
 type alias VoteData =
     { userId : String
-    , columnId : String
-    , cardId : String
+    , columnId : Column.Id
+    , cardId : Card.Id
     }
 
 
@@ -174,21 +177,21 @@ voteDecoder : Decode.Decoder VoteData
 voteDecoder =
     Pipeline.decode VoteData
         |> Pipeline.required "userId" Decode.string
-        |> Pipeline.required "columnId" Decode.string
-        |> Pipeline.required "cardId" Decode.string
+        |> Pipeline.required "columnId" Column.decodeId
+        |> Pipeline.required "cardId" Card.decodeId
 
 
 type alias DeleteData =
-    { columnId : String
-    , cardId : String
+    { columnId : Column.Id
+    , cardId : Card.Id
     }
 
 
 deleteDecoder : Decode.Decoder DeleteData
 deleteDecoder =
     Pipeline.decode DeleteData
-        |> Pipeline.required "columnId" Decode.string
-        |> Pipeline.required "cardId" Decode.string
+        |> Pipeline.required "columnId" Column.decodeId
+        |> Pipeline.required "cardId" Card.decodeId
 
 
 type alias UserData =
@@ -279,22 +282,22 @@ joinRetro sender retroId =
             ]
 
 
-add : Sender msg -> String -> String -> Cmd msg
+add : Sender msg -> Column.Id -> String -> Cmd msg
 add sender columnId cardText =
     sender "add" <|
         Encode.object
-            [ ( "columnId", Encode.string columnId )
+            [ ( "columnId", Column.encodeId columnId )
             , ( "cardText", Encode.string cardText )
             ]
 
 
-move : Sender msg -> String -> String -> String -> Cmd msg
+move : Sender msg -> Column.Id -> Column.Id -> Card.Id -> Cmd msg
 move sender columnFrom columnTo cardId =
     sender "move" <|
         Encode.object
-            [ ( "columnFrom", Encode.string columnFrom )
-            , ( "columnTo", Encode.string columnTo )
-            , ( "cardId", Encode.string cardId )
+            [ ( "columnFrom", Column.encodeId columnFrom )
+            , ( "columnTo", Column.encodeId columnTo )
+            , ( "cardId", Card.encodeId cardId )
             ]
 
 
@@ -306,61 +309,63 @@ stage sender stage =
             ]
 
 
-reveal : Sender msg -> String -> String -> Cmd msg
+reveal : Sender msg -> Column.Id -> Card.Id -> Cmd msg
 reveal sender columnId cardId =
     sender "reveal" <|
         Encode.object
-            [ ( "columnId", Encode.string columnId )
-            , ( "cardId", Encode.string cardId )
+            [ ( "columnId", Column.encodeId columnId )
+            , ( "cardId", Card.encodeId cardId )
             ]
 
 
-group : Sender msg -> String -> String -> String -> String -> Cmd msg
+group : Sender msg -> Column.Id -> Card.Id -> Column.Id -> Card.Id -> Cmd msg
 group sender columnFrom cardFrom columnTo cardTo =
     sender "group" <|
         Encode.object
-            [ ( "columnFrom", Encode.string columnFrom )
-            , ( "cardFrom", Encode.string cardFrom )
-            , ( "columnTo", Encode.string columnTo )
-            , ( "cardTo", Encode.string cardTo )
+            [ ( "columnFrom", Column.encodeId columnFrom )
+            , ( "cardFrom", Card.encodeId cardFrom )
+            , ( "columnTo", Column.encodeId columnTo )
+            , ( "cardTo", Card.encodeId cardTo )
             ]
 
 
-vote : Sender msg -> String -> String -> Cmd msg
+vote : Sender msg -> Column.Id -> Card.Id -> Cmd msg
 vote sender columnId cardId =
     sender "vote" <|
         Encode.object
-            [ ( "columnId", Encode.string columnId )
-            , ( "cardId", Encode.string cardId )
+            [ ( "columnId", Column.encodeId columnId )
+            , ( "cardId", Card.encodeId cardId )
             ]
 
 
-unvote : Sender msg -> String -> String -> Cmd msg
+unvote : Sender msg -> Column.Id -> Card.Id -> Cmd msg
 unvote sender columnId cardId =
     sender "unvote" <|
         Encode.object
-            [ ( "columnId", Encode.string columnId )
-            , ( "cardId", Encode.string cardId )
+            [ ( "columnId", Column.encodeId columnId )
+            , ( "cardId", Card.encodeId cardId )
             ]
 
 
-delete : Sender msg -> String -> String -> Cmd msg
+delete : Sender msg -> Column.Id -> Card.Id -> Cmd msg
 delete sender columnId cardId =
     sender "delete" <|
         Encode.object
-            [ ( "columnId", Encode.string columnId )
-            , ( "cardId", Encode.string cardId )
+            [ ( "columnId", Column.encodeId columnId )
+            , ( "cardId", Card.encodeId cardId )
             ]
 
-edit: Sender msg -> String -> String -> String -> String -> Cmd msg
-edit sender contentId columnId cardId cardText = 
+
+edit : Sender msg -> Content.Id -> Column.Id -> Card.Id -> String -> Cmd msg
+edit sender contentId columnId cardId cardText =
     sender "edit" <|
         Encode.object
-            [ ( "columnId", Encode.string columnId )
-            , ( "contentId", Encode.string contentId )
-            , ( "cardId", Encode.string cardId )
+            [ ( "columnId", Column.encodeId columnId )
+            , ( "contentId", Content.encodeId contentId )
+            , ( "cardId", Card.encodeId cardId )
             , ( "cardText", Encode.string cardText )
             ]
+
 
 menu : Sender msg -> Cmd msg
 menu sender =

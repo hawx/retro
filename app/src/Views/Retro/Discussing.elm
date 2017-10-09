@@ -4,6 +4,7 @@ import Bulma
 import Data.Card exposing (Card)
 import Data.Column as Column exposing (Column)
 import Dict exposing (Dict)
+import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.RetroModel exposing (..)
@@ -17,7 +18,7 @@ view userId model =
     columnsView model.retro.columns
 
 
-columnsView : Dict String Column -> Html msg
+columnsView : EveryDict Column.Id Column -> Html msg
 columnsView columns =
     Column.cardsByVote columns
         |> List.map columnView

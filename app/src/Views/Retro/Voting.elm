@@ -1,11 +1,12 @@
 module Views.Retro.Voting exposing (view)
 
 import Bulma
-import Data.Card exposing (Card)
-import Data.Column exposing (Column)
+import Data.Card as Card exposing (Card)
+import Data.Column as Column exposing (Column)
 import Data.Retro as Retro
 import Dict exposing (Dict)
 import DragAndDrop
+import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
@@ -20,24 +21,24 @@ view userId model =
     columnsView model.dnd model.retro.columns
 
 
-columnsView : DragAndDrop.Model CardDragging CardOver -> Dict String Column -> Html Msg
+columnsView : DragAndDrop.Model CardDragging CardOver -> EveryDict Column.Id Column -> Html Msg
 columnsView dnd columns =
-    Dict.toList columns
+    EveryDict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
         |> List.map (columnView dnd)
         |> Bulma.columns []
 
 
-columnView : DragAndDrop.Model CardDragging CardOver -> ( String, Column ) -> Html Msg
+columnView : DragAndDrop.Model CardDragging CardOver -> ( Column.Id, Column ) -> Html Msg
 columnView dnd ( columnId, column ) =
     Html.div [ Attr.class "column" ] <|
         Views.Retro.TitleCard.view column.name
-            :: (Dict.toList column.cards
+            :: (EveryDict.toList column.cards
                     |> List.map (cardView dnd columnId)
                )
 
 
-cardView : DragAndDrop.Model CardDragging CardOver -> String -> ( String, Card ) -> Html Msg
+cardView : DragAndDrop.Model CardDragging CardOver -> Column.Id -> ( Card.Id, Card ) -> Html Msg
 cardView dnd columnId ( cardId, card ) =
     if card.revealed then
         Bulma.card

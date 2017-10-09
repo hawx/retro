@@ -1,50 +1,76 @@
 module Data.Column
     exposing
         ( Column
+        , Id
         , addCard
         , cardsByVote
+        , create
+        , decodeId
+        , encodeId
         , getCard
         , removeCard
         , updateCard
         )
 
-import Data.Card exposing (Card)
+import Data.Card as Card exposing (Card)
 import Dict exposing (Dict)
+import EveryDict exposing (EveryDict)
+import Json.Decode as Decode
+import Json.Encode as Encode
 import List
 
 
+type Id
+    = Id String
+
+
+decodeId : Decode.Decoder Id
+decodeId =
+    Decode.string |> Decode.map Id
+
+
+encodeId : Id -> Encode.Value
+encodeId (Id id) =
+    Encode.string id
+
+
 type alias Column =
-    { id : String
+    { id : Id
     , name : String
     , order : Int
-    , cards : Dict String Card
+    , cards : EveryDict Card.Id Card
     }
 
 
-getCard : String -> Column -> Maybe Card
+create : String -> String -> Int -> Column
+create id name order =
+    { id = Id id, name = name, order = order, cards = EveryDict.empty }
+
+
+getCard : Card.Id -> Column -> Maybe Card
 getCard cardId column =
-    Dict.get cardId column.cards
+    EveryDict.get cardId column.cards
 
 
 addCard : Card -> Column -> Column
 addCard card column =
-    { column | cards = Dict.insert card.id card column.cards }
+    { column | cards = EveryDict.insert card.id card column.cards }
 
 
-removeCard : String -> Column -> Column
+removeCard : Card.Id -> Column -> Column
 removeCard cardId column =
-    { column | cards = Dict.remove cardId column.cards }
+    { column | cards = EveryDict.remove cardId column.cards }
 
 
-updateCard : String -> (Card -> Card) -> Column -> Column
+updateCard : Card.Id -> (Card -> Card) -> Column -> Column
 updateCard cardId f column =
-    { column | cards = Dict.update cardId (Maybe.map f) column.cards }
+    { column | cards = EveryDict.update cardId (Maybe.map f) column.cards }
 
 
-cardsByVote : Dict String Column -> List ( Int, List Card )
+cardsByVote : EveryDict Id Column -> List ( Int, List Card )
 cardsByVote columns =
-    Dict.values columns
-        |> List.map (.cards >> Dict.values)
+    EveryDict.values columns
+        |> List.map (.cards >> EveryDict.values)
         |> List.concat
         |> List.filter .revealed
         |> groupBy .totalVotes
