@@ -5,6 +5,7 @@ module Sock
         , add
         , createRetro
         , delete
+        , edit
         , group
         , joinRetro
         , listen
@@ -104,6 +105,7 @@ type alias ContentData =
     { columnId : String
     , cardId : String
     , cardText : String
+    , contentId: String
     }
 
 
@@ -113,6 +115,7 @@ contentDecoder =
         |> Pipeline.required "columnId" Decode.string
         |> Pipeline.required "cardId" Decode.string
         |> Pipeline.required "cardText" Decode.string
+        |> Pipeline.required "contentId" Decode.string
 
 
 type alias MoveData =
@@ -349,6 +352,15 @@ delete sender columnId cardId =
             , ( "cardId", Encode.string cardId )
             ]
 
+edit: Sender msg -> String -> String -> String -> String -> Cmd msg
+edit sender contentId columnId cardId cardText = 
+    sender "edit" <|
+        Encode.object
+            [ ( "columnId", Encode.string columnId )
+            , ( "contentId", Encode.string contentId )
+            , ( "cardId", Encode.string cardId )
+            , ( "cardText", Encode.string cardText )
+            ]
 
 menu : Sender msg -> Cmd msg
 menu sender =

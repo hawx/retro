@@ -12,6 +12,7 @@ type alias Card =
     , votes : Int
     , totalVotes : Int
     , contents : List Content
+    , editing: Bool
     }
 
 

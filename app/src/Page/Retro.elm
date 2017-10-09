@@ -91,6 +91,12 @@ update sender msg model =
         DeleteCard columnId cardId ->
             model ! [ Sock.delete sender columnId cardId ]
 
+        EditCard columnId cardId ->
+            { model | retro = Retro.editingCard columnId cardId True model.retro }  ! [ ] 
+            
+        UpdateCard columnId cardId contentId ->
+            { model | input = "", retro = Retro.editingCard columnId cardId False model.retro  } ! [ Sock.edit sender contentId columnId cardId model.input ]
+
         Navigate route ->
             model ! [ Route.navigate route ]
 
@@ -133,14 +139,15 @@ socketUpdate user ( id, msgData ) model =
                     , totalVotes = totalVotes
                     , revealed = revealed
                     , contents = []
+                    , editing = False
                     }
             in
             { model | retro = Retro.addCard columnId card model.retro } ! []
 
-        Sock.Content { columnId, cardId, cardText } ->
+        Sock.Content { contentId, columnId, cardId, cardText } ->
             let
                 content =
-                    { id = ""
+                    { id = contentId
                     , text = cardText
                     , author = id
                     }

@@ -51,6 +51,7 @@ type cardData struct {
 type contentData struct {
 	ColumnId string `json:"columnId"`
 	CardId   string `json:"cardId"`
+	ContentId string `json:"contentId"`
 	CardText string `json:"cardText"`
 }
 
@@ -175,7 +176,7 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 				contents, _ := r.db.GetContents(card.Id)
 				for _, content := range contents {
-					conn.Send(content.Author, "content", contentData{column.Id, card.Id, content.Text})
+					conn.Send(content.Author, "content", contentData{column.Id, card.Id, content.Id, content.Text})
 				}
 			}
 		}
@@ -242,8 +243,23 @@ func registerHandlers(r *Room, mux *sock.Server) {
 
 		conn.Broadcast("", "card", cardData{args.ColumnId, card.Id, card.Revealed, card.Votes, card.TotalVotes})
 
-		conn.Broadcast(content.Author, "content", contentData{args.ColumnId, content.Card, content.Text})
+		conn.Broadcast(content.Author, "content", contentData{args.ColumnId, content.Card, content.Id, content.Text})
 	})
+
+	mux.Handle("edit", func(conn *sock.Conn, data []byte) {
+		var content contentData
+		if err := json.Unmarshal(data, &content); err != nil {
+			log.Println("add:", err)
+			return
+		}
+
+		if err := r.db.UpdateContent(content.ContentId, content.CardText); err != nil {
+			log.Println("update db:", err)
+			return
+		}	
+
+		conn.Broadcast(conn.Name, "content", content)		
+	})	
 
 	mux.Handle("move", func(conn *sock.Conn, data []byte) {
 		var args moveData
