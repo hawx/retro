@@ -1,25 +1,50 @@
 module Data.Card
     exposing
         ( Card
-        , Content
+        , Id
         , authored
+        , create
+        , decodeId
+        , encodeId
         )
+
+import Data.Content exposing (Content)
+import Json.Decode as Decode
+import Json.Encode as Encode
+
+
+type Id
+    = Id String
+
+
+decodeId : Decode.Decoder Id
+decodeId =
+    Decode.string |> Decode.map Id
+
+
+encodeId : Id -> Encode.Value
+encodeId (Id id) =
+    Encode.string id
 
 
 type alias Card =
-    { id : String
+    { id : Id
     , revealed : Bool
     , votes : Int
     , totalVotes : Int
     , contents : List Content
-    , editing: Bool
+    , editing : Bool
     }
 
 
-type alias Content =
-    { id : String
-    , text : String
-    , author : String
+create : String -> Int -> Int -> Bool -> Card
+create id votes totalVotes revealed =
+    { id = Id id
+    , votes = votes
+    , totalVotes = totalVotes
+    , revealed = revealed
+    , contents = []
+    , editing = False
     }
 
 

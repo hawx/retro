@@ -1,7 +1,7 @@
 module Views.Retro.Contents exposing (view)
 
 import Bulma
-import Data.Card exposing (Content)
+import Data.Content exposing (Content)
 import Html exposing (Html)
 import Html.Attributes as Attr
 
