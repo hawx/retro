@@ -10,6 +10,7 @@ type Msg
     | CreateCard String
     | UpdateCard String String String 
     | DeleteCard String String
+    | DiscardEditCard String String
     | EditCard String String
     | SetStage Retro.Stage
     | Reveal String String

@@ -60,8 +60,8 @@ cardView connId stage dnd columnId ( cardId, card ) =
                 ]
         else
             Bulma.card []
-                [ Bulma.cardContent [] 
-                    [ Views.Retro.EditContents.view columnId card]
+                [ Bulma.discard [ Event.onClick (DiscardEditCard columnId cardId) ] 
+                , Bulma.cardContent [] [ Views.Retro.EditContents.view columnId card]
                 ]
     else
         Html.text ""

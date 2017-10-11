@@ -92,10 +92,13 @@ update sender msg model =
             model ! [ Sock.delete sender columnId cardId ]
 
         EditCard columnId cardId ->
-            { model | retro = Retro.editingCard columnId cardId True model.retro }  ! [ ] 
+            { model | retro = Retro.editingCard columnId cardId True model.retro } ! [ ] 
             
         UpdateCard columnId cardId contentId ->
             { model | input = "", retro = Retro.editingCard columnId cardId False model.retro  } ! [ Sock.edit sender contentId columnId cardId model.input ]
+
+        DiscardEditCard columnId cardId ->
+            { model | input = "", retro = Retro.editingCard columnId cardId False model.retro } ! []
 
         Navigate route ->
             model ! [ Route.navigate route ]
