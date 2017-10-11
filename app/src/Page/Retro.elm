@@ -11,6 +11,7 @@ import Bulma
 import Data.Retro as Retro
 import Dict
 import DragAndDrop
+import EveryDict
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.RetroModel exposing (..)
@@ -92,10 +93,10 @@ update sender msg model =
             model ! [ Sock.delete sender columnId cardId ]
 
         EditCard columnId cardId ->
-            { model | retro = Retro.editingCard columnId cardId True model.retro } ! [ ] 
-            
+            { model | retro = Retro.editingCard columnId cardId True model.retro } ! []
+
         UpdateCard columnId cardId contentId ->
-            { model | input = "", retro = Retro.editingCard columnId cardId False model.retro  } ! [ Sock.edit sender contentId columnId cardId model.input ]
+            { model | input = "", retro = Retro.editingCard columnId cardId False model.retro } ! [ Sock.edit sender contentId columnId cardId model.input ]
 
         DiscardEditCard columnId cardId ->
             { model | input = "", retro = Retro.editingCard columnId cardId False model.retro } ! []
@@ -160,7 +161,7 @@ socketUpdate user ( id, msgData ) model =
         Sock.Column { columnId, columnName, columnOrder } ->
             let
                 column =
-                    { id = columnId, name = columnName, order = columnOrder, cards = Dict.empty }
+                    { id = columnId, name = columnName, order = columnOrder, cards = EveryDict.empty }
             in
             { model | retro = Retro.addColumn column model.retro } ! []
 

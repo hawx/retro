@@ -1,20 +1,22 @@
 module Page.RetroModel exposing (CardDragging, CardOver, Model)
 
+import Data.Card as Card
+import Data.Column as Column
 import Data.Retro exposing (Retro)
 import DragAndDrop
 
 
 type alias CardDragging =
-    ( String, String )
+    ( Column.Id, Card.Id )
 
 
 type alias CardOver =
-    ( String, Maybe String )
+    ( Column.Id, Maybe Card.Id )
 
 
 type alias Model =
     { retro : Retro
     , input : String
     , dnd : DragAndDrop.Model CardDragging CardOver
-    , lastRevealed : Maybe String
+    , lastRevealed : Maybe Card.Id
     }
