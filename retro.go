@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -155,6 +156,12 @@ func VerifyTokenIsForUser(username, secret string, token jwt.JWT) bool {
 	validator := jwt.Validator{}
 	validator.SetAudience("retro.hawx.me")
 	validator.SetSubject(username)
+	validator.Fn = jwt.ValidateFunc(func(claims jwt.Claims) error {
+		if exp, ok := claims.Expiration(); !ok || time.Now().After(exp) {
+			return errors.New("token expired")
+		}
+		return nil
+	})
 
 	return validator.Validate(token) == nil
 }
@@ -163,6 +170,7 @@ func TokenForUser(username, secret string) ([]byte, error) {
 	claims := jws.Claims{}
 	claims.SetAudience("retro.hawx.me")
 	claims.SetSubject(username)
+	claims.SetExpiration(time.Now().Add(24 * time.Hour))
 
 	return jws.NewJWT(claims, crypto.SigningMethodHS256).Serialize([]byte(secret))
 }
