@@ -50,6 +50,7 @@ type alias Model =
     , flags : Flags
     , menu : Menu.Model
     , retro : Retro.Model
+    , connected : Bool
     }
 
 
@@ -64,6 +65,7 @@ init flags location =
                 , flags = flags
                 , menu = Menu.empty
                 , retro = Retro.empty
+                , connected = False
                 }
     in
     initModel
@@ -119,6 +121,9 @@ update msg model =
         SetId (Just idToken) ->
             routeChange model.route { model | token = IdToken.decode idToken }
 
+        SetId Nothing ->
+            { model | connected = True } ! []
+
         Socket data ->
             let
                 ( retroModel, retroCmd ) =
@@ -133,14 +138,12 @@ update msg model =
             { newModel
                 | retro = retroModel
                 , menu = menuModel
+                , connected = True
             }
                 ! [ newCmd, Cmd.map RetroMsg retroCmd, Cmd.map MenuMsg menuCmd ]
 
         UrlChange location ->
             urlChange location model
-
-        _ ->
-            model ! []
 
 
 urlChange : Navigation.Location -> Model -> ( Model, Cmd Msg )
@@ -197,7 +200,7 @@ handleError : String -> Model -> ( Model, Cmd Msg )
 handleError error model =
     case error of
         "bad_auth" ->
-            { model | token = Nothing } ! []
+            { model | token = Nothing, connected = True } ! []
 
         _ ->
             model ! []
@@ -209,12 +212,12 @@ handleError error model =
 
 view : Model -> Html Msg
 view model =
-    case model.token of
-        Just token ->
+    case ( model.connected, model.token ) of
+        ( True, Just token ) ->
             innerView token.username model
 
-        Nothing ->
-            SignIn.view
+        _ ->
+            SignIn.view model.connected
 
 
 innerView : String -> Model -> Html Msg
