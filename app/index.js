@@ -10,18 +10,14 @@ var qs = window.location.search.substring(1).split('&').reduce(function (a, e) {
   return a;
 }, {});
 
-if (qs['user'] && qs['token']) {
-  localStorage.setItem('id', qs['user'] + ';' + qs['token']);
+if (qs['token']) {
+  localStorage.setItem('id', qs['token']);
   window.location.search = '';
 }
 
 var app = Elm.Main.fullscreen({
   host: window.location.host,
   isSecure: window.location.protocol === 'https:'
-});
-
-app.ports.storageSet.subscribe(function([key, value]) {
-  localStorage.setItem(key, value);
 });
 
 app.ports.signOut.subscribe(function() {

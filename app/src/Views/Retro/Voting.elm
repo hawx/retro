@@ -16,8 +16,8 @@ import Views.Retro.Contents
 import Views.Retro.TitleCard
 
 
-view : String -> Model -> Html Msg
-view userId model =
+view : Model -> Html Msg
+view model =
     columnsView model.dnd model.retro.columns
 
 

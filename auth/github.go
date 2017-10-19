@@ -2,14 +2,14 @@ package auth
 
 import (
 	"context"
-	"golang.org/x/oauth2"
-	"net/http"
-	"log"
 	"encoding/json"
-	"github.com/google/uuid"
+	"log"
+	"net/http"
+
+	"golang.org/x/oauth2"
 )
 
-func GitHub(addUser func(user, token string), clientID, clientSecret, organisation string) (login, callback http.HandlerFunc) {
+func GitHub(addUser func(user string) (string, error), clientID, clientSecret, organisation string) (login, callback http.HandlerFunc) {
 	ctx := context.Background()
 	conf := &oauth2.Config{
 		ClientID:     clientID,
@@ -51,10 +51,12 @@ func GitHub(addUser func(user, token string), clientID, clientSecret, organisati
 		}
 
 		if inOrg {
-			token := strId()
-			addUser(user, token)
-
-			http.Redirect(w, r, "/?user="+user+"&token="+token, http.StatusFound)
+			idToken, err := addUser(user)
+			if err != nil {
+				http.Redirect(w, r, "/?error=could_not_create_user", http.StatusFound)
+			} else {
+				http.Redirect(w, r, "/?token="+idToken, http.StatusFound)
+			}
 		} else {
 			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
 		}
@@ -101,9 +103,4 @@ func isInOrg(client *http.Client, expectedOrg string) (bool, error) {
 	}
 
 	return false, nil
-}
-
-func strId() string {
-	id, _ := uuid.NewRandom()
-	return id.String()
 }

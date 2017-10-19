@@ -26,6 +26,7 @@ purposes of retro.
 import Data.Card as Card
 import Data.Column as Column
 import Data.Content as Content
+import Data.IdToken exposing (IdToken)
 import Date exposing (Date)
 import Dict
 import Json.Decode as Decode
@@ -269,9 +270,9 @@ type alias Sender msg =
     String -> Encode.Value -> Cmd msg
 
 
-send : String -> String -> String -> Sender msg
+send : String -> String -> IdToken -> Sender msg
 send url id token =
-    Sock.LowLevel.send url id token
+    Sock.LowLevel.send url id token.raw
 
 
 joinRetro : Sender msg -> String -> Cmd msg

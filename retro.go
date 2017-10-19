@@ -3,16 +3,20 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/BurntSushi/toml"
+	"github.com/SermoDigital/jose/crypto"
+	"github.com/SermoDigital/jose/jws"
+	"github.com/SermoDigital/jose/jwt"
 	"github.com/google/uuid"
 	"hawx.me/code/retro/auth"
 	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
-	"log"
-	"net/http"
-	"sync"
-	"time"
 )
 
 func strId() string {
@@ -49,10 +53,10 @@ type cardData struct {
 }
 
 type contentData struct {
-	ColumnId string `json:"columnId"`
-	CardId   string `json:"cardId"`
+	ColumnId  string `json:"columnId"`
+	CardId    string `json:"cardId"`
 	ContentId string `json:"contentId"`
-	CardText string `json:"cardText"`
+	CardText  string `json:"cardText"`
 }
 
 type moveData struct {
@@ -121,17 +125,46 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func (r *Room) AddUser(user, token string) {
+func (r *Room) AddUser(user string) (string, error) {
+	secret := strId()
+
 	r.db.EnsureUser(database.User{
 		Username: user,
-		Token:    token,
+		Token:    secret,
 	})
+
+	token, err := TokenForUser(user, secret)
+	if err != nil {
+		return "", err
+	}
+	return string(token), err
 }
 
 func (r *Room) IsUser(user, token string) bool {
 	found, err := r.db.GetUser(user)
 
-	return err == nil && found.Token == token
+	parsedToken, err := jws.ParseJWT([]byte(token))
+	if err != nil {
+		return false
+	}
+
+	return VerifyTokenIsForUser(user, found.Token, parsedToken)
+}
+
+func VerifyTokenIsForUser(username, secret string, token jwt.JWT) bool {
+	validator := jwt.Validator{}
+	validator.SetAudience("retro.hawx.me")
+	validator.SetSubject(username)
+
+	return validator.Validate(token) == nil
+}
+
+func TokenForUser(username, secret string) ([]byte, error) {
+	claims := jws.Claims{}
+	claims.SetAudience("retro.hawx.me")
+	claims.SetSubject(username)
+
+	return jws.NewJWT(claims, crypto.SigningMethodHS256).Serialize([]byte(secret))
 }
 
 func registerHandlers(r *Room, mux *sock.Server) {
@@ -256,10 +289,10 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		if err := r.db.UpdateContent(content.ContentId, content.CardText); err != nil {
 			log.Println("update db:", err)
 			return
-		}	
+		}
 
-		conn.Broadcast(conn.Name, "content", content)		
-	})	
+		conn.Broadcast(conn.Name, "content", content)
+	})
 
 	mux.Handle("move", func(conn *sock.Conn, data []byte) {
 		var args moveData
@@ -452,11 +485,18 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.server)
 
-	gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, conf.GitHub.ClientID, conf.GitHub.ClientSecret, conf.GitHub.Organisation)
+	gitHubLogin, gitHubCallback := auth.GitHub(
+		room.AddUser,
+		conf.GitHub.ClientID,
+		conf.GitHub.ClientSecret,
+		conf.GitHub.Organisation)
 	http.Handle("/oauth/github/login", gitHubLogin)
 	http.Handle("/oauth/github/callback", gitHubCallback)
 
-	officeLogin, officeCallback := auth.Office365(room.AddUser, conf.Office365.ClientID, conf.Office365.ClientSecret, conf.Office365.Domain)
+	officeLogin, officeCallback := auth.Office365(room.AddUser,
+		conf.Office365.ClientID,
+		conf.Office365.ClientSecret,
+		conf.Office365.Domain)
 	http.Handle("/oauth/office365/login", officeLogin)
 	http.Handle("/oauth/office365/callback", officeCallback)
 

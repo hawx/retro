@@ -17,36 +17,36 @@ import Views.Retro.TitleCard
 
 
 view : String -> Model -> Html Msg
-view userId model =
-    columnsView userId model.lastRevealed model.retro.columns
+view username model =
+    columnsView username model.lastRevealed model.retro.columns
 
 
 columnsView : String -> Maybe Card.Id -> EveryDict Column.Id Column -> Html Msg
-columnsView connId lastRevealed columns =
+columnsView username lastRevealed columns =
     EveryDict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
-        |> List.map (columnView connId lastRevealed)
+        |> List.map (columnView username lastRevealed)
         |> Bulma.columns []
 
 
 columnView : String -> Maybe Card.Id -> ( Column.Id, Column ) -> Html Msg
-columnView connId lastRevealed ( columnId, column ) =
+columnView username lastRevealed ( columnId, column ) =
     Html.div [ Attr.class "column" ] <|
         Views.Retro.TitleCard.view column.name
             :: (EveryDict.toList column.cards
-                    |> List.map (cardView connId columnId lastRevealed)
+                    |> List.map (cardView username columnId lastRevealed)
                )
 
 
 cardView : String -> Column.Id -> Maybe Card.Id -> ( Card.Id, Card ) -> Html Msg
-cardView connId columnId lastRevealed ( cardId, card ) =
+cardView username columnId lastRevealed ( cardId, card ) =
     if card.revealed then
         Bulma.card [ Attr.classList [ ( "last-revealed", lastRevealed == Just cardId ) ] ]
             [ Bulma.cardContent []
                 [ Views.Retro.Contents.view card.contents
                 ]
             ]
-    else if Card.authored connId card then
+    else if Card.authored username card then
         Bulma.card
             [ Attr.classList
                 [ ( "not-revealed", not card.revealed )

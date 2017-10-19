@@ -125,7 +125,7 @@ parseStage s =
 
 
 socketUpdate : Maybe String -> ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate user ( id, msgData ) model =
+socketUpdate username ( id, msgData ) model =
     case msgData of
         Sock.Stage { stage } ->
             case parseStage stage of
@@ -175,13 +175,13 @@ socketUpdate user ( id, msgData ) model =
             { model | retro = Retro.groupCards ( columnFrom, cardFrom ) ( columnTo, cardTo ) model.retro } ! []
 
         Sock.Vote { userId, columnId, cardId } ->
-            if Just userId == user then
+            if Just userId == username then
                 { model | retro = Retro.voteCard 1 columnId cardId model.retro } ! []
             else
                 { model | retro = Retro.totalVoteCard 1 columnId cardId model.retro } ! []
 
         Sock.Unvote { userId, columnId, cardId } ->
-            if Just userId == user then
+            if Just userId == username then
                 { model | retro = Retro.voteCard -1 columnId cardId model.retro } ! []
             else
                 { model | retro = Retro.totalVoteCard -1 columnId cardId model.retro } ! []
@@ -197,23 +197,23 @@ socketUpdate user ( id, msgData ) model =
 
 
 view : String -> Model -> Html Msg
-view userId model =
+view username model =
     Html.div [ Attr.class "site-content" ]
         [ Views.Retro.Header.view model.retro.stage
         , Bulma.section [ Attr.class "fill-height x-auto-scroll" ]
             [ Html.div [ Attr.class "container is-fluid" ]
                 [ case model.retro.stage of
                     Retro.Discussing ->
-                        Views.Retro.Discussing.view userId model
+                        Views.Retro.Discussing.view model
 
                     Retro.Thinking ->
-                        Views.Retro.Thinking.view userId model
+                        Views.Retro.Thinking.view username model
 
                     Retro.Presenting ->
-                        Views.Retro.Presenting.view userId model
+                        Views.Retro.Presenting.view username model
 
                     Retro.Voting ->
-                        Views.Retro.Voting.view userId model
+                        Views.Retro.Voting.view model
                 ]
             ]
         , Views.Footer.view

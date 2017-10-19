@@ -1,9 +1,6 @@
 port module Port exposing (..)
 
 
-port storageSet : ( String, String ) -> Cmd msg
-
-
 port storageGet : String -> Cmd msg
 
 

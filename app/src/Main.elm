@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import Data.IdToken as IdToken exposing (IdToken)
 import Html exposing (Html)
 import Navigation
 import Page.Menu as Menu
@@ -45,8 +46,7 @@ webSocketUrl flags =
 
 type alias Model =
     { route : Route
-    , user : Maybe String
-    , token : Maybe String
+    , token : Maybe IdToken
     , flags : Flags
     , menu : Menu.Model
     , retro : Retro.Model
@@ -60,7 +60,6 @@ init flags location =
             urlChange
                 location
                 { route = Route.Menu
-                , user = Nothing
                 , token = Nothing
                 , flags = flags
                 , menu = Menu.empty
@@ -85,20 +84,20 @@ type Msg
     | RetroMsg Retro.Msg
 
 
-sockSender : Flags -> String -> String -> Sock.Sender msg
-sockSender flags userId token =
-    Sock.send (webSocketUrl flags) userId token
+sockSender : Flags -> String -> IdToken -> Sock.Sender msg
+sockSender flags username token =
+    Sock.send (webSocketUrl flags) username token
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         MenuMsg subMsg ->
-            case Maybe.map2 (,) model.user model.token of
-                Just ( userId, token ) ->
+            case model.token of
+                Just token ->
                     let
                         ( menuModel, menuMsg ) =
-                            Menu.update (sockSender model.flags userId token) subMsg model.menu
+                            Menu.update (sockSender model.flags token.username token) subMsg model.menu
                     in
                     { model | menu = menuModel } ! [ Cmd.map MenuMsg menuMsg ]
 
@@ -106,33 +105,24 @@ update msg model =
                     model ! []
 
         RetroMsg subMsg ->
-            case Maybe.map2 (,) model.user model.token of
-                Just ( userId, token ) ->
+            case model.token of
+                Just token ->
                     let
                         ( retroModel, retroMsg ) =
-                            Retro.update (sockSender model.flags userId token) subMsg model.retro
+                            Retro.update (sockSender model.flags token.username token) subMsg model.retro
                     in
                     { model | retro = retroModel } ! [ Cmd.map RetroMsg retroMsg ]
 
                 Nothing ->
                     model ! []
 
-        SetId (Just parts) ->
-            case String.split ";" parts of
-                [ id, token ] ->
-                    routeChange model.route
-                        { model
-                            | user = Just id
-                            , token = Just token
-                        }
-
-                _ ->
-                    { model | user = Nothing } ! []
+        SetId (Just idToken) ->
+            routeChange model.route { model | token = IdToken.decode idToken }
 
         Socket data ->
             let
                 ( retroModel, retroCmd ) =
-                    Sock.update data model.retro (Retro.socketUpdate model.user)
+                    Sock.update data model.retro (Retro.socketUpdate (Maybe.map .username model.token))
 
                 ( menuModel, menuCmd ) =
                     Sock.update data model.menu Menu.socketUpdate
@@ -185,9 +175,9 @@ routeChange route model =
 
 runWithSockSender : Model -> (Sock.Sender msg -> Cmd msg) -> Cmd msg
 runWithSockSender model f =
-    case Maybe.map2 (,) model.user model.token of
-        Just ( userId, token ) ->
-            f (sockSender model.flags userId token)
+    case model.token of
+        Just token ->
+            f (sockSender model.flags token.username token)
 
         Nothing ->
             Cmd.none
@@ -207,7 +197,7 @@ handleError : String -> Model -> ( Model, Cmd Msg )
 handleError error model =
     case error of
         "bad_auth" ->
-            { model | user = Nothing, token = Nothing } ! []
+            { model | token = Nothing } ! []
 
         _ ->
             model ! []
@@ -219,22 +209,22 @@ handleError error model =
 
 view : Model -> Html Msg
 view model =
-    case model.user of
-        Just userId ->
-            innerView userId model
+    case model.token of
+        Just token ->
+            innerView token.username model
 
         Nothing ->
             SignIn.view
 
 
 innerView : String -> Model -> Html Msg
-innerView userId model =
+innerView username model =
     case model.route of
         Route.Menu ->
-            Html.map MenuMsg (Menu.view userId model.menu)
+            Html.map MenuMsg (Menu.view username model.menu)
 
         Route.Retro retroId ->
-            Html.map RetroMsg (Retro.view userId model.retro)
+            Html.map RetroMsg (Retro.view username model.retro)
 
 
 
