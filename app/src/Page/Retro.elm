@@ -16,6 +16,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.RetroModel exposing (..)
 import Page.RetroMsg exposing (Msg(..))
+import Port
 import Route
 import Sock
 import Views.Footer
@@ -103,6 +104,9 @@ update sender msg model =
 
         Navigate route ->
             model ! [ Route.navigate route ]
+
+        SignOut ->
+            model ! [ Port.signOut () ]
 
 
 parseStage : String -> Maybe Retro.Stage
@@ -199,7 +203,7 @@ socketUpdate username ( id, msgData ) model =
 view : String -> Model -> Html Msg
 view username model =
     Html.div [ Attr.class "site-content" ]
-        [ Views.Retro.Header.view model.retro.stage
+        [ Views.Retro.Header.view username model.retro.stage
         , Bulma.section [ Attr.class "fill-height x-auto-scroll" ]
             [ Html.div [ Attr.class "container is-fluid" ]
                 [ case model.retro.stage of

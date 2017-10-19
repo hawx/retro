@@ -7,10 +7,11 @@ import Html.Attributes as Attr
 import Html.Events as Event
 import Page.RetroMsg exposing (Msg(..))
 import Route
+import Views.UserMenu as UserMenu
 
 
-view : Retro.Stage -> Html Msg
-view current =
+view : String -> Retro.Stage -> Html Msg
+view currentUser currentStage =
     Html.section [ Attr.class "hero is-dark is-bold" ]
         [ Html.div [ Attr.class "hero-body" ]
             [ Bulma.container
@@ -20,8 +21,9 @@ view current =
                         ]
                     , Bulma.levelRight
                         [ [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick (Navigate Route.Menu) ]
-                                [ Html.text "Back" ]
+                                [ Html.text "Menu" ]
                           ]
+                        , [ UserMenu.view currentUser SignOut ]
                         ]
                     ]
                 ]
@@ -30,10 +32,10 @@ view current =
             [ Bulma.container
                 [ Bulma.tabs [ Attr.class "is-boxed is-fullwidth" ]
                     [ Html.ul []
-                        [ tab current Retro.Thinking
-                        , tab current Retro.Presenting
-                        , tab current Retro.Voting
-                        , tab current Retro.Discussing
+                        [ tab currentStage Retro.Thinking
+                        , tab currentStage Retro.Presenting
+                        , tab currentStage Retro.Voting
+                        , tab currentStage Retro.Discussing
                         ]
                     ]
                 ]

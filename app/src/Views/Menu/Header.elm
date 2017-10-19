@@ -5,6 +5,7 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
 import Page.MenuMsg exposing (Msg(SignOut))
+import Views.UserMenu as UserMenu
 
 
 view : String -> Html Msg
@@ -17,12 +18,7 @@ view currentUser =
                         [ [ Bulma.title "Retro" ]
                         ]
                     , Bulma.levelRight
-                        [ [ Html.span []
-                                [ Html.text currentUser ]
-                          ]
-                        , [ Html.a [ Attr.class "button is-outlined is-white", Event.onClick SignOut ]
-                                [ Html.text "Sign-out" ]
-                          ]
+                        [ [ UserMenu.view currentUser SignOut ]
                         ]
                     ]
                 ]
