@@ -87,6 +87,15 @@ delete attrs =
     Html.button (Attr.class "delete" :: attrs) []
 
 
+discard: List (Html.Attribute msg) -> Html msg
+discard attrs =
+    Html.a (Attr.class "discard" :: attrs)
+        [ Html.span [ Attr.class "icon is-small" ]
+            [ Html.i [ Attr.class "fa fa-undo"] []
+            ]
+        ]
+
+
 container : List (Html msg) -> Html msg
 container =
     Html.div [ Attr.class "container" ]

@@ -11,8 +11,9 @@ import Route exposing (Route)
 type Msg
     = ChangeInput Column.Id String
     | CreateCard Column.Id
-    | UpdateCard Column.Id Card.Id Content.Id
+    | UpdateCard Column.Id Card.Id Content.Id 
     | DeleteCard Column.Id Card.Id
+    | DiscardEditCard Column.Id Card.Id
     | EditCard Column.Id Card.Id
     | SetStage Retro.Stage
     | Reveal Column.Id Card.Id
