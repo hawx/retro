@@ -1,9 +1,4 @@
-module Sock.LowLevel
-    exposing
-        ( listen
-        , send
-        , update
-        )
+module Sock.LowLevel exposing (listen, send)
 
 {-| This module provides a basic format for passing websocket messages with. It
 contains the generic parts of the implementation that define a JSON object with
@@ -72,16 +67,6 @@ send url id token op data =
         |> WebSocket.send url
 
 
-listen : String -> (String -> msg) -> Sub msg
-listen url tagger =
-    WebSocket.listen url tagger
-
-
-update : String -> model -> (SocketMsg -> model -> ( model, Cmd msg )) -> ( model, Cmd msg )
-update data model f =
-    case Decode.decodeString socketMsgDecoder data of
-        Ok socketMsg ->
-            f socketMsg model
-
-        Err _ ->
-            ( model, Cmd.none )
+listen : String -> Sub (Result String SocketMsg)
+listen url =
+    WebSocket.listen url identity |> Sub.map (Decode.decodeString socketMsgDecoder)

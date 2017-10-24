@@ -1,6 +1,6 @@
 module Sock
     exposing
-        ( MsgData(..)
+        ( Msg(..)
         , Sender
         , add
         , createRetro
@@ -15,7 +15,6 @@ module Sock
         , send
         , stage
         , unvote
-        , update
         , vote
         )
 
@@ -35,7 +34,7 @@ import Json.Encode as Encode
 import Sock.LowLevel
 
 
-type MsgData
+type Msg
     = Error ErrorData
     | Stage StageData
     | Column ColumnData
@@ -109,16 +108,18 @@ type alias ContentData =
     { columnId : Column.Id
     , cardId : Card.Id
     , contentId : Content.Id
+    , author : String
     , cardText : String
     }
 
 
-contentDecoder : Decode.Decoder ContentData
-contentDecoder =
+contentDecoder : String -> Decode.Decoder ContentData
+contentDecoder author =
     Pipeline.decode ContentData
         |> Pipeline.required "columnId" Column.decodeId
         |> Pipeline.required "cardId" Card.decodeId
         |> Pipeline.required "contentId" Content.decodeId
+        |> Pipeline.hardcoded author
         |> Pipeline.required "cardText" Decode.string
 
 
@@ -222,48 +223,71 @@ retroDecoder =
         |> Pipeline.required "participants" (Decode.list Decode.string)
 
 
-listen : String -> (String -> msg) -> Sub msg
-listen =
-    Sock.LowLevel.listen
+listen : String -> (Msg -> msg) -> Sub msg
+listen addr tagger =
+    Sock.LowLevel.listen addr
+        |> Sub.map (decodeData >> tagger)
 
 
-update : String -> model -> (( String, MsgData ) -> model -> ( model, Cmd msg )) -> ( model, Cmd msg )
-update data model f =
-    let
-        runOp decoder tagger d id m =
-            case Decode.decodeString decoder d of
-                Ok thing ->
-                    f ( id, tagger thing ) m
+decodeData : Result String { id : String, op : String, data : String } -> Msg
+decodeData result =
+    case result of
+        Ok { id, op, data } ->
+            case op of
+                "stage" ->
+                    decodeOperation Stage stageDecoder data
 
-                Err e ->
-                    f ( id, Error (ErrorData e) ) m
+                "card" ->
+                    decodeOperation Card cardDecoder data
 
-        mux =
-            Dict.fromList
-                [ ( "stage", runOp stageDecoder Stage )
-                , ( "card", runOp cardDecoder Card )
-                , ( "content", runOp contentDecoder Content )
-                , ( "column", runOp columnDecoder Column )
-                , ( "move", runOp moveDecoder Move )
-                , ( "reveal", runOp revealDecoder Reveal )
-                , ( "group", runOp groupDecoder Group )
-                , ( "vote", runOp voteDecoder Vote )
-                , ( "unvote", runOp voteDecoder Unvote )
-                , ( "error", runOp errorDecoder Error )
-                , ( "delete", runOp deleteDecoder Delete )
-                , ( "user", runOp userDecoder User )
-                , ( "retro", runOp retroDecoder Retro )
-                ]
+                "content" ->
+                    decodeOperation Content (contentDecoder id) data
 
-        runMux { id, op, data } model =
-            case Dict.get op mux of
-                Just guy ->
-                    guy data id model
+                "column" ->
+                    decodeOperation Column columnDecoder data
 
-                Nothing ->
-                    ( model, Cmd.none )
-    in
-    Sock.LowLevel.update data model runMux
+                "move" ->
+                    decodeOperation Move moveDecoder data
+
+                "reveal" ->
+                    decodeOperation Reveal revealDecoder data
+
+                "group" ->
+                    decodeOperation Group groupDecoder data
+
+                "vote" ->
+                    decodeOperation Vote voteDecoder data
+
+                "unvote" ->
+                    decodeOperation Unvote voteDecoder data
+
+                "delete" ->
+                    decodeOperation Delete deleteDecoder data
+
+                "user" ->
+                    decodeOperation User userDecoder data
+
+                "retro" ->
+                    decodeOperation Retro retroDecoder data
+
+                "error" ->
+                    decodeOperation Error errorDecoder data
+
+                _ ->
+                    Error { error = "unknown operation: " ++ op }
+
+        Err err ->
+            Error { error = err }
+
+
+decodeOperation : (value -> Msg) -> Decode.Decoder value -> String -> Msg
+decodeOperation tagger decoder data =
+    case Decode.decodeString decoder data of
+        Ok x ->
+            tagger x
+
+        Err e ->
+            Error (ErrorData e)
 
 
 type alias Sender msg =

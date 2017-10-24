@@ -128,9 +128,9 @@ parseStage s =
             Nothing
 
 
-socketUpdate : Maybe String -> ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate username ( id, msgData ) model =
-    case msgData of
+socketUpdate : Maybe String -> Sock.Msg -> Model -> ( Model, Cmd Msg )
+socketUpdate username msg model =
+    case msg of
         Sock.Stage { stage } ->
             case parseStage stage of
                 Just s ->
@@ -152,12 +152,12 @@ socketUpdate username ( id, msgData ) model =
             in
             { model | retro = Retro.addCard columnId card model.retro } ! []
 
-        Sock.Content { contentId, columnId, cardId, cardText } ->
+        Sock.Content { contentId, columnId, cardId, author, cardText } ->
             let
                 content =
                     { id = contentId
                     , text = cardText
-                    , author = id
+                    , author = author
                     }
             in
             { model | retro = Retro.addContent columnId cardId content model.retro } ! []

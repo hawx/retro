@@ -73,9 +73,9 @@ update sender msg model =
             model ! [ Port.signOut () ]
 
 
-socketUpdate : ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate ( _, msgData ) model =
-    case msgData of
+socketUpdate : Sock.Msg -> Model -> ( Model, Cmd Msg )
+socketUpdate msg model =
+    case msg of
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []
 

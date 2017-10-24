@@ -80,7 +80,7 @@ init flags location =
 
 type Msg
     = SetId (Maybe String)
-    | Socket String
+    | Socket Sock.Msg
     | UrlChange Navigation.Location
     | MenuMsg Menu.Msg
     | RetroMsg Retro.Msg
@@ -127,13 +127,13 @@ update msg model =
         Socket data ->
             let
                 ( retroModel, retroCmd ) =
-                    Sock.update data model.retro (Retro.socketUpdate (Maybe.map .username model.token))
+                    Retro.socketUpdate (Maybe.map .username model.token) data model.retro
 
                 ( menuModel, menuCmd ) =
-                    Sock.update data model.menu Menu.socketUpdate
+                    Menu.socketUpdate data model.menu
 
                 ( newModel, newCmd ) =
-                    Sock.update data model socketUpdate
+                    socketUpdate data model
             in
             { newModel
                 | retro = retroModel
@@ -186,9 +186,9 @@ runWithSockSender model f =
             Cmd.none
 
 
-socketUpdate : ( String, Sock.MsgData ) -> Model -> ( Model, Cmd Msg )
-socketUpdate ( id, msgData ) model =
-    case msgData of
+socketUpdate : Sock.Msg -> Model -> ( Model, Cmd Msg )
+socketUpdate msg model =
+    case msg of
         Sock.Error { error } ->
             handleError error model
 
