@@ -70,7 +70,7 @@ init flags location =
     in
     initModel
         ! [ initCmd
-          , Port.storageGet "id"
+          , Port.storageGet "idToken"
           ]
 
 
@@ -122,7 +122,7 @@ update msg model =
             routeChange model.route { model | token = IdToken.decode idToken }
 
         SetId Nothing ->
-            { model | connected = True } ! []
+            { model | token = Nothing, connected = True } ! []
 
         Socket data ->
             let

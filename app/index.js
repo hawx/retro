@@ -11,7 +11,7 @@ var qs = window.location.search.substring(1).split('&').reduce(function (a, e) {
 }, {});
 
 if (qs['token']) {
-  localStorage.setItem('id', qs['token']);
+  localStorage.setItem('idToken', qs['token']);
   window.location.search = '';
 }
 
@@ -21,7 +21,7 @@ var app = Elm.Main.fullscreen({
 });
 
 app.ports.signOut.subscribe(function() {
-  localStorage.removeItem('id');
+  localStorage.removeItem('idToken');
   window.location.reload();
 });
 
