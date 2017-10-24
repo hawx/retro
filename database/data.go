@@ -25,7 +25,7 @@ func (d *Database) setup() error {
 	_, err := d.db.Exec(`
     CREATE TABLE IF NOT EXISTS users (
       Username  TEXT PRIMARY KEY,
-      Token     TEXT
+      Secret    TEXT
     );
 
     CREATE TABLE IF NOT EXISTS retros (

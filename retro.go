@@ -126,15 +126,14 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func (r *Room) AddUser(user string) (string, error) {
-	secret := strId()
+func (r *Room) AddUser(username string) (string, error) {
+	r.db.EnsureUser(username, strId())
+	user, err := r.db.GetUser(username)
+	if err != nil {
+		return "", err
+	}
 
-	r.db.EnsureUser(database.User{
-		Username: user,
-		Token:    secret,
-	})
-
-	token, err := TokenForUser(user, secret)
+	token, err := TokenForUser(user.Username, user.Secret)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +148,7 @@ func (r *Room) IsUser(user, token string) bool {
 		return false
 	}
 
-	return VerifyTokenIsForUser(user, found.Token, parsedToken)
+	return VerifyTokenIsForUser(user, found.Secret, parsedToken)
 }
 
 func VerifyTokenIsForUser(username, secret string, token jwt.JWT) bool {
