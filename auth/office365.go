@@ -2,14 +2,15 @@ package auth
 
 import (
 	"context"
-	"strings"
 	"encoding/json"
-	"golang.org/x/oauth2"
 	"log"
 	"net/http"
+	"strings"
+
+	"golang.org/x/oauth2"
 )
 
-func Office365(addUser func(user, token string), clientID, clientSecret, domain string) (login, callback http.HandlerFunc) {
+func Office365(authCallback AuthCallback, clientID, clientSecret, domain string) (login, callback http.HandlerFunc) {
 	ctx := context.Background()
 	conf := &oauth2.Config{
 		ClientID:     clientID,
@@ -44,14 +45,7 @@ func Office365(addUser func(user, token string), clientID, clientSecret, domain 
 			return
 		}
 
-		if isInDomain(user, domain) {
-			token := strId()
-			addUser(user, token)
-
-			http.Redirect(w, r, "/?user="+user+"&token="+token, http.StatusFound)
-		} else {
-			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
-		}
+		authCallback(w, r, isInDomain(user, domain), user)
 	}
 
 	return login, callback

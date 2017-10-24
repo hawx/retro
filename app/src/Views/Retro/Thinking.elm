@@ -19,27 +19,27 @@ import Views.Retro.TitleCard
 
 
 view : String -> Model -> Html Msg
-view userId model =
-    columnsView userId model.retro.stage model.dnd model.retro.columns
+view username model =
+    columnsView username model.retro.stage model.dnd model.retro.columns
 
 
 columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> EveryDict Column.Id Column -> Html Msg
-columnsView connId stage dnd columns =
+columnsView username stage dnd columns =
     EveryDict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
-        |> List.map (columnView connId stage dnd)
+        |> List.map (columnView username stage dnd)
         |> Bulma.columns []
 
 
 columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> ( Column.Id, Column ) -> Html Msg
-columnView connId stage dnd ( columnId, column ) =
+columnView username stage dnd ( columnId, column ) =
     let
         title =
             [ Views.Retro.TitleCard.view column.name ]
 
         list =
             EveryDict.toList column.cards
-                |> List.map (cardView connId stage dnd columnId)
+                |> List.map (cardView username stage dnd columnId)
 
         add =
             [ addCardView columnId ]
@@ -52,8 +52,8 @@ columnView connId stage dnd ( columnId, column ) =
 
 
 cardView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> Column.Id -> ( Card.Id, Card ) -> Html Msg
-cardView connId stage dnd columnId ( cardId, card ) =
-    if Card.authored connId card then
+cardView username stage dnd columnId ( cardId, card ) =
+    if Card.authored username card then
         if not card.editing then
             Bulma.card (DragAndDrop.draggable DnD ( columnId, cardId ))
                 [ Bulma.delete [ Event.onClick (DeleteCard columnId cardId) ]
@@ -61,8 +61,8 @@ cardView connId stage dnd columnId ( cardId, card ) =
                 ]
         else
             Bulma.card []
-                [ Bulma.discard [ Event.onClick (DiscardEditCard columnId cardId) ] 
-                , Bulma.cardContent [] [ Views.Retro.EditContents.view columnId card]
+                [ Bulma.discard [ Event.onClick (DiscardEditCard columnId cardId) ]
+                , Bulma.cardContent [] [ Views.Retro.EditContents.view columnId card ]
                 ]
     else
         Html.text ""

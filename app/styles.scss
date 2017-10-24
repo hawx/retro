@@ -15,6 +15,10 @@
   overflow-x: auto;
 }
 
+.hero.is-dark .dropdown-content {
+  color: $grey-dark;
+}
+
 .content {
   overflow-wrap: break-word;
 }
@@ -94,7 +98,7 @@
   margin: .5rem;
 }
 
-.card .discard { 
+.card .discard {
   float: right;
   margin: .5rem;
 }

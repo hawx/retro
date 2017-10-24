@@ -2,17 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/BurntSushi/toml"
+	"github.com/SermoDigital/jose/crypto"
+	"github.com/SermoDigital/jose/jws"
+	"github.com/SermoDigital/jose/jwt"
 	"github.com/google/uuid"
 	"hawx.me/code/retro/auth"
 	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/sock"
 	"hawx.me/code/serve"
-	"log"
-	"net/http"
-	"sync"
-	"time"
 )
 
 func strId() string {
@@ -49,10 +54,10 @@ type cardData struct {
 }
 
 type contentData struct {
-	ColumnId string `json:"columnId"`
-	CardId   string `json:"cardId"`
+	ColumnId  string `json:"columnId"`
+	CardId    string `json:"cardId"`
 	ContentId string `json:"contentId"`
-	CardText string `json:"cardText"`
+	CardText  string `json:"cardText"`
 }
 
 type moveData struct {
@@ -121,17 +126,65 @@ func boolToString(b bool) string {
 	return "false"
 }
 
-func (r *Room) AddUser(user, token string) {
-	r.db.EnsureUser(database.User{
-		Username: user,
-		Token:    token,
-	})
+func (r *Room) AddUser(username string) (string, error) {
+	r.db.EnsureUser(username, strId())
+	user, err := r.db.GetUser(username)
+	if err != nil {
+		return "", err
+	}
+
+	token, err := TokenForUser(user.Username, user.Secret)
+	if err != nil {
+		return "", err
+	}
+	return string(token), err
 }
 
 func (r *Room) IsUser(user, token string) bool {
 	found, err := r.db.GetUser(user)
 
-	return err == nil && found.Token == token
+	parsedToken, err := jws.ParseJWT([]byte(token))
+	if err != nil {
+		return false
+	}
+
+	return VerifyTokenIsForUser(user, found.Secret, parsedToken)
+}
+
+func (room *Room) AuthCallback(w http.ResponseWriter, r *http.Request, allowed bool, user string) {
+	if allowed {
+		idToken, err := room.AddUser(user)
+		if err != nil {
+			http.Redirect(w, r, "/?error=could_not_create_user", http.StatusFound)
+		} else {
+			http.Redirect(w, r, "/?token="+idToken, http.StatusFound)
+		}
+	} else {
+		http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
+	}
+}
+
+func VerifyTokenIsForUser(username, secret string, token jwt.JWT) bool {
+	validator := jwt.Validator{}
+	validator.SetAudience("retro.hawx.me")
+	validator.SetSubject(username)
+	validator.Fn = jwt.ValidateFunc(func(claims jwt.Claims) error {
+		if exp, ok := claims.Expiration(); !ok || time.Now().After(exp) {
+			return errors.New("token expired")
+		}
+		return nil
+	})
+
+	return validator.Validate(token) == nil
+}
+
+func TokenForUser(username, secret string) ([]byte, error) {
+	claims := jws.Claims{}
+	claims.SetAudience("retro.hawx.me")
+	claims.SetSubject(username)
+	claims.SetExpiration(time.Now().Add(24 * time.Hour))
+
+	return jws.NewJWT(claims, crypto.SigningMethodHS256).Serialize([]byte(secret))
 }
 
 func registerHandlers(r *Room, mux *sock.Server) {
@@ -256,10 +309,10 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		if err := r.db.UpdateContent(content.ContentId, content.CardText); err != nil {
 			log.Println("update db:", err)
 			return
-		}	
+		}
 
-		conn.Broadcast(conn.Name, "content", content)		
-	})	
+		conn.Broadcast(conn.Name, "content", content)
+	})
 
 	mux.Handle("move", func(conn *sock.Conn, data []byte) {
 		var args moveData
@@ -452,11 +505,19 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.server)
 
-	gitHubLogin, gitHubCallback := auth.GitHub(room.AddUser, conf.GitHub.ClientID, conf.GitHub.ClientSecret, conf.GitHub.Organisation)
+	gitHubLogin, gitHubCallback := auth.GitHub(
+		room.AuthCallback,
+		conf.GitHub.ClientID,
+		conf.GitHub.ClientSecret,
+		conf.GitHub.Organisation)
 	http.Handle("/oauth/github/login", gitHubLogin)
 	http.Handle("/oauth/github/callback", gitHubCallback)
 
-	officeLogin, officeCallback := auth.Office365(room.AddUser, conf.Office365.ClientID, conf.Office365.ClientSecret, conf.Office365.Domain)
+	officeLogin, officeCallback := auth.Office365(
+		room.AuthCallback,
+		conf.Office365.ClientID,
+		conf.Office365.ClientSecret,
+		conf.Office365.Domain)
 	http.Handle("/oauth/office365/login", officeLogin)
 	http.Handle("/oauth/office365/callback", officeCallback)
 

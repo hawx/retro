@@ -11,7 +11,7 @@ import Route exposing (Route)
 type Msg
     = ChangeInput Column.Id String
     | CreateCard Column.Id
-    | UpdateCard Column.Id Card.Id Content.Id 
+    | UpdateCard Column.Id Card.Id Content.Id
     | DeleteCard Column.Id Card.Id
     | DiscardEditCard Column.Id Card.Id
     | EditCard Column.Id Card.Id
@@ -21,3 +21,4 @@ type Msg
     | Unvote Column.Id Card.Id
     | DnD (DragAndDrop.Msg ( Column.Id, Card.Id ) ( Column.Id, Maybe Card.Id ))
     | Navigate Route
+    | SignOut
