@@ -10,7 +10,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func Office365(addUser func(user string) (string, error), clientID, clientSecret, domain string) (login, callback http.HandlerFunc) {
+func Office365(authCallback AuthCallback, clientID, clientSecret, domain string) (login, callback http.HandlerFunc) {
 	ctx := context.Background()
 	conf := &oauth2.Config{
 		ClientID:     clientID,
@@ -45,16 +45,7 @@ func Office365(addUser func(user string) (string, error), clientID, clientSecret
 			return
 		}
 
-		if isInDomain(user, domain) {
-			idToken, err := addUser(user)
-			if err != nil {
-				http.Redirect(w, r, "/?error=could_not_create_user", http.StatusFound)
-			} else {
-				http.Redirect(w, r, "/?token="+idToken, http.StatusFound)
-			}
-		} else {
-			http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
-		}
+		authCallback(w, r, isInDomain(user, domain), user)
 	}
 
 	return login, callback

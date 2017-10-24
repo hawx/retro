@@ -151,6 +151,19 @@ func (r *Room) IsUser(user, token string) bool {
 	return VerifyTokenIsForUser(user, found.Secret, parsedToken)
 }
 
+func (room *Room) AuthCallback(w http.ResponseWriter, r *http.Request, allowed bool, user string) {
+	if allowed {
+		idToken, err := room.AddUser(user)
+		if err != nil {
+			http.Redirect(w, r, "/?error=could_not_create_user", http.StatusFound)
+		} else {
+			http.Redirect(w, r, "/?token="+idToken, http.StatusFound)
+		}
+	} else {
+		http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
+	}
+}
+
 func VerifyTokenIsForUser(username, secret string, token jwt.JWT) bool {
 	validator := jwt.Validator{}
 	validator.SetAudience("retro.hawx.me")
@@ -493,14 +506,15 @@ func main() {
 	http.Handle("/ws", room.server)
 
 	gitHubLogin, gitHubCallback := auth.GitHub(
-		room.AddUser,
+		room.AuthCallback,
 		conf.GitHub.ClientID,
 		conf.GitHub.ClientSecret,
 		conf.GitHub.Organisation)
 	http.Handle("/oauth/github/login", gitHubLogin)
 	http.Handle("/oauth/github/callback", gitHubCallback)
 
-	officeLogin, officeCallback := auth.Office365(room.AddUser,
+	officeLogin, officeCallback := auth.Office365(
+		room.AuthCallback,
 		conf.Office365.ClientID,
 		conf.Office365.ClientSecret,
 		conf.Office365.Domain)
