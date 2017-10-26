@@ -70,15 +70,18 @@ cardView username stage dnd columnId ( cardId, card ) =
 
 addCardView : Column.Id -> Html Msg
 addCardView columnId =
-    Bulma.card []
+    Bulma.card [ Attr.class "add-card" ]
         [ Bulma.cardContent []
             [ Bulma.content []
                 [ Html.textarea
                     [ Event.onInput (ChangeInput columnId)
                     , ExtraEvent.onEnter (CreateCard columnId)
-                    , Attr.placeholder "Add a card..."
+                    , Attr.placeholder "Something constructive..."
                     ]
                     []
                 ]
+            ]
+        , Bulma.cardFooter []
+            [ Bulma.cardFooterItem [ Event.onClick (CreateCard columnId) ] "Add"
             ]
         ]
