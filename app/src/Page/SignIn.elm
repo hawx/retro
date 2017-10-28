@@ -6,8 +6,8 @@ import Html.Attributes as Attr
 import Views.Footer
 
 
-view : Bool -> Html msg
-view connected =
+view : { a | hasGitHub : Bool, hasOffice365 : Bool, connected : Bool } -> Html msg
+view { hasGitHub, hasOffice365, connected } =
     Html.div [ Attr.class "site-content" ]
         [ Html.section [ Attr.class "hero is-dark is-bold is-large fill-height" ]
             [ Html.div [ Attr.class "hero-body" ]
@@ -16,20 +16,26 @@ view connected =
                     , Bulma.subtitle "For running retrospectives remotely"
                     , if connected then
                         Html.div [ Attr.class "field is-grouped" ]
-                            [ Html.p [ Attr.class "control" ]
-                                [ Html.a
-                                    [ Attr.class "button is-primary is-outlined"
-                                    , Attr.href "/oauth/github/login"
+                            [ if hasGitHub then
+                                Html.p [ Attr.class "control" ]
+                                    [ Html.a
+                                        [ Attr.class "button is-primary is-outlined"
+                                        , Attr.href "/oauth/github/login"
+                                        ]
+                                        [ Html.text "Sign-in with GitHub" ]
                                     ]
-                                    [ Html.text "Sign-in with GitHub" ]
-                                ]
-                            , Html.p [ Attr.class "control" ]
-                                [ Html.a
-                                    [ Attr.class "button is-danger is-outlined"
-                                    , Attr.href "/oauth/office365/login"
+                              else
+                                Html.text ""
+                            , if hasOffice365 then
+                                Html.p [ Attr.class "control" ]
+                                    [ Html.a
+                                        [ Attr.class "button is-danger is-outlined"
+                                        , Attr.href "/oauth/office365/login"
+                                        ]
+                                        [ Html.text "Sign-in with Office365" ]
                                     ]
-                                    [ Html.text "Sign-in with Office365" ]
-                                ]
+                              else
+                                Html.text ""
                             ]
                       else
                         Html.div []

@@ -70,6 +70,7 @@ func (room *Room) AuthCallback(w http.ResponseWriter, r *http.Request, allowed b
 		http.Redirect(w, r, "/?error=not_in_org", http.StatusFound)
 	}
 }
+
 func verifyTokenIsForUser(username, secret string, token jwt.JWT) bool {
 	validator := jwt.Validator{}
 	validator.SetAudience("retro.hawx.me")

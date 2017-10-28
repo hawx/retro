@@ -14,6 +14,13 @@ func registerHandlers(r *Room, mux *sock.Server) {
 		return r.IsUser(auth.Username, auth.Token)
 	})
 
+	mux.OnConnect(func(conn *sock.Conn) {
+		conn.Send("", "hello", helloData{
+			HasGitHub:    true,
+			HasOffice365: false,
+		})
+	})
+
 	mux.Handle("joinRetro", func(conn *sock.Conn, data []byte) {
 		var args struct {
 			RetroId string
@@ -292,6 +299,11 @@ type msg struct {
 
 type errorData struct {
 	Error string `json:"error"`
+}
+
+type helloData struct {
+	HasGitHub    bool `json:"hasGitHub"`
+	HasOffice365 bool `json:"hasOffice365"`
 }
 
 type stageData struct {

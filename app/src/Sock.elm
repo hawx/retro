@@ -36,6 +36,7 @@ import Sock.LowLevel
 
 type Msg
     = Error ErrorData
+    | Hello HelloData
     | Stage StageData
     | Column ColumnData
     | Card CardData
@@ -58,6 +59,19 @@ errorDecoder : Decode.Decoder ErrorData
 errorDecoder =
     Pipeline.decode ErrorData
         |> Pipeline.required "error" Decode.string
+
+
+type alias HelloData =
+    { hasGitHub : Bool
+    , hasOffice365 : Bool
+    }
+
+
+helloDecoder : Decode.Decoder HelloData
+helloDecoder =
+    Pipeline.decode HelloData
+        |> Pipeline.required "hasGitHub" Decode.bool
+        |> Pipeline.required "hasOffice365" Decode.bool
 
 
 type alias StageData =
@@ -234,6 +248,9 @@ decodeData result =
     case result of
         Ok { id, op, data } ->
             case op of
+                "hello" ->
+                    decodeOperation Hello helloDecoder data
+
                 "stage" ->
                     decodeOperation Stage stageDecoder data
 

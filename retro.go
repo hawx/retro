@@ -13,8 +13,8 @@ import (
 )
 
 type config struct {
-	GitHub    gitHubConfig    `toml:"github"`
-	Office365 office365Config `toml:"office365"`
+	GitHub    *gitHubConfig    `toml:"github"`
+	Office365 *office365Config `toml:"office365"`
 }
 
 type gitHubConfig struct {
@@ -55,21 +55,25 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.Server)
 
-	gitHubLogin, gitHubCallback := auth.GitHub(
-		room.AuthCallback,
-		conf.GitHub.ClientID,
-		conf.GitHub.ClientSecret,
-		conf.GitHub.Organisation)
-	http.Handle("/oauth/github/login", gitHubLogin)
-	http.Handle("/oauth/github/callback", gitHubCallback)
+	if conf.GitHub != nil {
+		gitHubLogin, gitHubCallback := auth.GitHub(
+			room.AuthCallback,
+			conf.GitHub.ClientID,
+			conf.GitHub.ClientSecret,
+			conf.GitHub.Organisation)
+		http.Handle("/oauth/github/login", gitHubLogin)
+		http.Handle("/oauth/github/callback", gitHubCallback)
+	}
 
-	officeLogin, officeCallback := auth.Office365(
-		room.AuthCallback,
-		conf.Office365.ClientID,
-		conf.Office365.ClientSecret,
-		conf.Office365.Domain)
-	http.Handle("/oauth/office365/login", officeLogin)
-	http.Handle("/oauth/office365/callback", officeCallback)
+	if conf.Office365 != nil {
+		officeLogin, officeCallback := auth.Office365(
+			room.AuthCallback,
+			conf.Office365.ClientID,
+			conf.Office365.ClientSecret,
+			conf.Office365.Domain)
+		http.Handle("/oauth/office365/login", officeLogin)
+		http.Handle("/oauth/office365/callback", officeCallback)
+	}
 
 	serve.Serve(*port, *socket, http.DefaultServeMux)
 }
