@@ -31,6 +31,8 @@ contentView content =
         ]
 
 
+{-| Translation of <https://stackoverflow.com/questions/3426404/create-a-hexadecimal-colour-based-on-a-string-with-javascript>
+-}
 stringToColour : String -> String
 stringToColour str =
     let
