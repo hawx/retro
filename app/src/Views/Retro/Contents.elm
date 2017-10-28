@@ -21,11 +21,10 @@ contentView content =
     Bulma.content []
         [ Html.p [ Attr.class "title is-6" ]
             [ Html.span
-                [ Attr.class "tag"
+                [ Attr.class "indicator"
                 , Attr.style [ ( "background-color", stringToColour content.author ) ]
                 ]
                 []
-            , Html.span [] [ Html.text "  " ]
             , Html.text content.author
             ]
         , Html.p [] [ Html.text content.text ]

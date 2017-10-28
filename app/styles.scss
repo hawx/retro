@@ -102,3 +102,15 @@
   float: right;
   margin: .5rem;
 }
+
+.indicator {
+  display: inline-flex;
+  height: 1rem;
+  width: 1rem;
+  padding: 0;
+  line-height: 1;
+  border-radius: 50000px;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+  margin-top: -0.2rem;
+}
