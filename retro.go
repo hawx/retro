@@ -5,29 +5,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/BurntSushi/toml"
 	"hawx.me/code/retro/auth"
+	"hawx.me/code/retro/config"
 	"hawx.me/code/retro/database"
 	"hawx.me/code/retro/room"
 	"hawx.me/code/serve"
 )
-
-type config struct {
-	GitHub    *gitHubConfig    `toml:"github"`
-	Office365 *office365Config `toml:"office365"`
-}
-
-type gitHubConfig struct {
-	ClientID     string `toml:"clientID"`
-	ClientSecret string `toml:"clientSecret"`
-	Organisation string `toml:"organisation"`
-}
-
-type office365Config struct {
-	ClientID     string `toml:"clientID"`
-	ClientSecret string `toml:"clientSecret"`
-	Domain       string `toml:"domain"`
-}
 
 func main() {
 	var (
@@ -39,8 +22,8 @@ func main() {
 	)
 	flag.Parse()
 
-	var conf config
-	if _, err := toml.DecodeFile(*configPath, &conf); err != nil {
+	conf, err := config.Read(*configPath)
+	if err != nil {
 		log.Fatal(err)
 	}
 
