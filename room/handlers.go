@@ -9,15 +9,15 @@ import (
 	"hawx.me/code/retro/sock"
 )
 
-func registerHandlers(r *Room, mux *sock.Server) {
+func registerHandlers(config Config, r *Room, mux *sock.Server) {
 	mux.Auth(func(auth sock.MsgAuth) bool {
 		return r.IsUser(auth.Username, auth.Token)
 	})
 
 	mux.OnConnect(func(conn *sock.Conn) {
 		conn.Send("", "hello", helloData{
-			HasGitHub:    true,
-			HasOffice365: false,
+			HasGitHub:    config.HasGitHub,
+			HasOffice365: config.HasOffice365,
 		})
 	})
 

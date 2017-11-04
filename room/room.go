@@ -22,13 +22,18 @@ type Room struct {
 	users map[string]string
 }
 
-func New(db *database.Database) *Room {
+type Config struct {
+	HasGitHub    bool
+	HasOffice365 bool
+}
+
+func New(config Config, db *database.Database) *Room {
 	room := &Room{
 		db:     db,
 		Server: sock.NewServer(),
 	}
 
-	registerHandlers(room, room.Server)
+	registerHandlers(config, room, room.Server)
 
 	return room
 }

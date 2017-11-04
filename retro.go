@@ -39,18 +39,21 @@ func main() {
 	)
 	flag.Parse()
 
+	var conf config
+	if _, err := toml.DecodeFile(*configPath, &conf); err != nil {
+		log.Fatal(err)
+	}
+
 	db, err := database.Open(*dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	room := room.New(db)
-
-	conf := config{}
-	if _, err := toml.DecodeFile(*configPath, &conf); err != nil {
-		log.Fatal(err)
-	}
+	room := room.New(room.Config{
+		HasGitHub:    conf.GitHub != nil,
+		HasOffice365: conf.Office365 != nil,
+	}, db)
 
 	http.Handle("/", http.FileServer(http.Dir(*assets)))
 	http.Handle("/ws", room.Server)
