@@ -40,3 +40,7 @@ func (s *Server) Handle(op string, handler Handler) {
 func (s *Server) Auth(authenticate Authenticator) {
 	s.mux.authenticate = authenticate
 }
+
+func (s *Server) OnConnect(handler OnConnectHandler) {
+	s.mux.onConnect = &handler
+}

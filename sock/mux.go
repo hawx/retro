@@ -7,13 +7,14 @@ import (
 )
 
 type Handler func(conn *Conn, data []byte)
-
+type OnConnectHandler func(conn *Conn)
 type Authenticator func(MsgAuth) bool
 
 type mux struct {
 	// I'm trusting you not to insert handlers once Serve is called...
 	handlers map[string]Handler
 
+	onConnect    *OnConnectHandler
 	authenticate Authenticator
 }
 
@@ -28,6 +29,10 @@ func (m *mux) handle(op string, handler Handler) {
 }
 
 func (m *mux) serve(conn *Conn) error {
+	if m.onConnect != nil {
+		(*m.onConnect)(conn)
+	}
+
 	for {
 		var msg Msg
 		if err := websocket.JSON.Receive(conn.ws, &msg); err != nil {
