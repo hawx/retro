@@ -2,6 +2,7 @@ package sock
 
 import (
 	"errors"
+	"log"
 
 	"golang.org/x/net/websocket"
 )
@@ -48,6 +49,7 @@ func (m *mux) serve(conn *Conn) error {
 
 		handler, ok := m.handlers[msg.Op]
 		if !ok {
+			log.Println("unhandled msg:", msg.Op)
 			continue
 		}
 

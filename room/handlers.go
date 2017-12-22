@@ -225,6 +225,26 @@ func registerHandlers(config Config, r *Room, mux *sock.Server) {
 		conn.Broadcast(conn.Name, "delete", args)
 	})
 
+	mux.Handle("addParticipant", func(conn *sock.Conn, data []byte) {
+		var args participantData
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.db.AddParticipant(args.RetroId, args.Participant)
+		conn.Broadcast(conn.Name, "addParticipant", args)
+	})
+
+	mux.Handle("deleteParticipant", func(conn *sock.Conn, data []byte) {
+		var args participantData
+		if err := json.Unmarshal(data, &args); err != nil {
+			return
+		}
+
+		r.db.DeleteParticipant(args.RetroId, args.Participant)
+		conn.Broadcast(conn.Name, "deleteParticipant", args)
+	})
+
 	mux.Handle("createRetro", func(conn *sock.Conn, data []byte) {
 		var args struct {
 			Name  string   `json:"name"`
@@ -362,6 +382,11 @@ type deleteData struct {
 
 type userData struct {
 	Username string `json:"username"`
+}
+
+type participantData struct {
+	RetroId     string `json:"retroId"`
+	Participant string `json:"participant"`
 }
 
 type retroData struct {

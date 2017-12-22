@@ -8,6 +8,7 @@ module Page.Menu
         )
 
 import Bulma
+import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.MenuModel exposing (..)
@@ -24,12 +25,11 @@ import Views.Menu.New
 
 empty : Model
 empty =
-    { retroList = []
+    { retros = EveryDict.empty
     , retroName = ""
     , possibleParticipants = []
-    , participants = []
     , participant = ""
-    , currentChoice = Nothing
+    , currentChoice = NewRetroScreen
     }
 
 
@@ -44,27 +44,40 @@ update sender msg model =
         SetRetroName input ->
             { model | retroName = input } ! []
 
+        NewRetro ->
+            { model | currentChoice = NewRetroScreen } ! []
+
         CreateRetro ->
-            model ! [ Sock.createRetro sender model.retroName model.participants ]
+            model ! [ Sock.createRetro sender model.retroName [] ]
 
         SetParticipant input ->
             { model | participant = input } ! []
 
         AddParticipant ->
-            { model
-                | participant = ""
-                , participants = model.participant :: model.participants
-            }
-                ! []
+            { model | participant = "" }
+                ! [ case model.currentChoice of
+                        DisplayRetroScreen retro ->
+                            Sock.addParticipant sender retro model.participant
+
+                        NewRetroScreen ->
+                            Cmd.none
+                  ]
 
         DeleteParticipant name ->
-            { model | participants = List.filter ((/=) name) model.participants } ! []
+            model
+                ! [ case model.currentChoice of
+                        DisplayRetroScreen retro ->
+                            Sock.deleteParticipant sender retro name
 
-        SelectParticipant name ->
-            { model | participants = name :: model.participants } ! []
+                        NewRetroScreen ->
+                            Cmd.none
+                  ]
 
         ShowRetroDetails retroId ->
-            { model | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList } ! []
+            { model
+                | currentChoice = DisplayRetroScreen retroId
+            }
+                ! []
 
         Navigate route ->
             model ! [ Route.navigate route ]
@@ -79,19 +92,35 @@ socketUpdate msg model =
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []
 
+        Sock.AddParticipant { retroId, participant } ->
+            { model | retros = EveryDict.update retroId (Maybe.map (addParticipant participant)) model.retros } ! []
+
+        Sock.DeleteParticipant { retroId, participant } ->
+            { model | retros = EveryDict.update retroId (Maybe.map (deleteParticipant participant)) model.retros } ! []
+
         Sock.Retro { id, name, createdAt, participants } ->
             let
                 newRetro =
                     Retro id name createdAt participants
             in
             { model
-                | retroList = newRetro :: model.retroList
-                , currentChoice = Just newRetro
+                | retros = EveryDict.insert id newRetro model.retros
+                , currentChoice = DisplayRetroScreen id
             }
                 ! []
 
         _ ->
             model ! []
+
+
+addParticipant : String -> Retro -> Retro
+addParticipant participant retro =
+    { retro | participants = retro.participants ++ [ participant ] }
+
+
+deleteParticipant : String -> Retro -> Retro
+deleteParticipant participant retro =
+    { retro | participants = List.filter ((/=) participant) retro.participants }
 
 
 view : String -> Model -> Html Msg
@@ -101,15 +130,23 @@ view currentUser model =
         , Bulma.section [ Attr.class "fill-height" ]
             [ Bulma.container
                 [ Bulma.columns []
-                    [ Bulma.column []
-                        [ Views.Menu.List.view model ]
-                    , Bulma.column []
-                        [ Maybe.map Views.Menu.Current.view model.currentChoice
-                            |> Maybe.withDefault (Html.text "")
+                    [ Bulma.column [ Attr.class "is-one-third" ]
+                        [ case model.currentChoice of
+                            NewRetroScreen ->
+                                Views.Menu.List.view Nothing model.retros
+
+                            DisplayRetroScreen id ->
+                                Views.Menu.List.view (Just id) model.retros
                         ]
                     , Bulma.column []
-                        [ Bulma.box []
-                            [ Views.Menu.New.view currentUser model ]
+                        [ case model.currentChoice of
+                            NewRetroScreen ->
+                                Views.Menu.New.view currentUser model
+
+                            DisplayRetroScreen current ->
+                                EveryDict.get current model.retros
+                                    |> Maybe.map (Views.Menu.Current.view currentUser model)
+                                    |> Maybe.withDefault (Html.text "")
                         ]
                     ]
                 ]

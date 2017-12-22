@@ -5,6 +5,28 @@ import Data.Column as Column exposing (Column)
 import Data.Content exposing (Content)
 import Dict exposing (Dict)
 import EveryDict exposing (EveryDict)
+import Json.Decode as Decode
+import Json.Encode as Encode
+import Route exposing (Route)
+
+
+type Id
+    = Id String
+
+
+decodeId : Decode.Decoder Id
+decodeId =
+    Decode.string |> Decode.map Id
+
+
+encodeId : Id -> Encode.Value
+encodeId (Id id) =
+    Encode.string id
+
+
+idToRoute : Id -> Route
+idToRoute (Id id) =
+    Route.Retro id
 
 
 type Stage
