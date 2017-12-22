@@ -18,6 +18,7 @@ func registerHandlers(config Config, r *Room, mux *sock.Server) {
 		conn.Send("", "hello", helloData{
 			HasGitHub:    config.HasGitHub,
 			HasOffice365: config.HasOffice365,
+			HasTest:      config.HasTest,
 		})
 	})
 
@@ -324,6 +325,7 @@ type errorData struct {
 type helloData struct {
 	HasGitHub    bool `json:"hasGitHub"`
 	HasOffice365 bool `json:"hasOffice365"`
+	HasTest      bool `json:"hasTest"`
 }
 
 type stageData struct {
