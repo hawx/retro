@@ -20,19 +20,19 @@ import Views.Retro.TitleCard
 
 view : String -> Model -> Html Msg
 view username model =
-    columnsView username model.retro.stage model.dnd model.retro.columns
+    columnsView username model.retro.stage model.dnd model.input model.retro.columns
 
 
-columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> EveryDict Column.Id Column -> Html Msg
-columnsView username stage dnd columns =
+columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> EveryDict Column.Id Column -> Html Msg
+columnsView username stage dnd input columns =
     EveryDict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
-        |> List.map (columnView username stage dnd)
+        |> List.map (columnView username stage dnd input)
         |> Bulma.columns []
 
 
-columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> ( Column.Id, Column ) -> Html Msg
-columnView username stage dnd ( columnId, column ) =
+columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> ( Column.Id, Column ) -> Html Msg
+columnView username stage dnd input ( columnId, column ) =
     let
         title =
             [ Views.Retro.TitleCard.view column.name ]
@@ -42,7 +42,7 @@ columnView username stage dnd ( columnId, column ) =
                 |> List.map (cardView username stage dnd columnId)
 
         add =
-            [ addCardView columnId ]
+            [ addCardView columnId input ]
     in
     Bulma.column
         (Attr.classList [ ( "over", dnd.over == Just ( columnId, Nothing ) ) ]
@@ -68,8 +68,8 @@ cardView username stage dnd columnId ( cardId, card ) =
         Html.text ""
 
 
-addCardView : Column.Id -> Html Msg
-addCardView columnId =
+addCardView : Column.Id -> String -> Html Msg
+addCardView columnId input =
     Bulma.card [ Attr.class "add-card" ]
         [ Bulma.cardContent []
             [ Bulma.content []
@@ -77,6 +77,7 @@ addCardView columnId =
                     [ Event.onInput (ChangeInput columnId)
                     , ExtraEvent.onEnter (CreateCard columnId)
                     , Attr.placeholder "Something constructive..."
+                    , Attr.defaultValue input
                     ]
                     []
                 ]
