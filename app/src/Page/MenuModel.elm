@@ -1,4 +1,4 @@
-module Page.MenuModel exposing (Model, Retro)
+module Page.MenuModel exposing (Choice(..), Model, Retro)
 
 import Data.Retro exposing (Id)
 import Date exposing (Date)
@@ -13,11 +13,15 @@ type alias Retro =
     }
 
 
+type Choice
+    = NewRetroScreen
+    | DisplayRetroScreen Id
+
+
 type alias Model =
     { retros : EveryDict Id Retro
     , retroName : String
     , possibleParticipants : List String
     , participant : String
-    , currentChoice : Maybe Id
-    , showNewRetro : Bool
+    , currentChoice : Choice
     }

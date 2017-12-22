@@ -29,8 +29,7 @@ empty =
     , retroName = ""
     , possibleParticipants = []
     , participant = ""
-    , currentChoice = Nothing
-    , showNewRetro = False
+    , currentChoice = NewRetroScreen
     }
 
 
@@ -46,7 +45,7 @@ update sender msg model =
             { model | retroName = input } ! []
 
         NewRetro ->
-            { model | showNewRetro = True, currentChoice = Nothing } ! []
+            { model | currentChoice = NewRetroScreen } ! []
 
         CreateRetro ->
             model ! [ Sock.createRetro sender model.retroName [] ]
@@ -56,20 +55,27 @@ update sender msg model =
 
         AddParticipant ->
             { model | participant = "" }
-                ! [ Maybe.map (\retro -> Sock.addParticipant sender retro model.participant) model.currentChoice
-                        |> Maybe.withDefault Cmd.none
+                ! [ case model.currentChoice of
+                        DisplayRetroScreen retro ->
+                            Sock.addParticipant sender retro model.participant
+
+                        NewRetroScreen ->
+                            Cmd.none
                   ]
 
         DeleteParticipant name ->
             model
-                ! [ Maybe.map (\retro -> Sock.deleteParticipant sender retro name) model.currentChoice
-                        |> Maybe.withDefault Cmd.none
+                ! [ case model.currentChoice of
+                        DisplayRetroScreen retro ->
+                            Sock.deleteParticipant sender retro name
+
+                        NewRetroScreen ->
+                            Cmd.none
                   ]
 
         ShowRetroDetails retroId ->
             { model
-                | currentChoice = Just retroId
-                , showNewRetro = False
+                | currentChoice = DisplayRetroScreen retroId
             }
                 ! []
 
@@ -99,8 +105,7 @@ socketUpdate msg model =
             in
             { model
                 | retros = EveryDict.insert id newRetro model.retros
-                , currentChoice = Just id
-                , showNewRetro = False
+                , currentChoice = DisplayRetroScreen id
             }
                 ! []
 
@@ -126,15 +131,22 @@ view currentUser model =
             [ Bulma.container
                 [ Bulma.columns []
                     [ Bulma.column [ Attr.class "is-one-third" ]
-                        [ Views.Menu.List.view model ]
+                        [ case model.currentChoice of
+                            NewRetroScreen ->
+                                Views.Menu.List.view Nothing model.retros
+
+                            DisplayRetroScreen id ->
+                                Views.Menu.List.view (Just id) model.retros
+                        ]
                     , Bulma.column []
-                        [ if model.showNewRetro then
-                            Views.Menu.New.view currentUser model
-                          else
-                            model.currentChoice
-                                |> Maybe.andThen (\current -> EveryDict.get current model.retros)
-                                |> Maybe.map (Views.Menu.Current.view currentUser model)
-                                |> Maybe.withDefault (Html.text "")
+                        [ case model.currentChoice of
+                            NewRetroScreen ->
+                                Views.Menu.New.view currentUser model
+
+                            DisplayRetroScreen current ->
+                                EveryDict.get current model.retros
+                                    |> Maybe.map (Views.Menu.Current.view currentUser model)
+                                    |> Maybe.withDefault (Html.text "")
                         ]
                     ]
                 ]

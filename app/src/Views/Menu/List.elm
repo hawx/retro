@@ -1,7 +1,7 @@
 module Views.Menu.List exposing (view)
 
 import Data.Retro exposing (Id)
-import EveryDict
+import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
@@ -9,8 +9,8 @@ import Page.MenuModel exposing (Model, Retro)
 import Page.MenuMsg exposing (..)
 
 
-view : Model -> Html Msg
-view model =
+view : Maybe Id -> EveryDict Id Retro -> Html Msg
+view current retros =
     Html.div [ Attr.class "menu" ]
         [ Html.ul [ Attr.class "menu-list" ]
             [ Html.li []
@@ -21,8 +21,8 @@ view model =
         , Html.p [ Attr.class "menu-label" ]
             [ Html.text "Your Retros" ]
         , Html.ul [ Attr.class "menu-list" ]
-            (EveryDict.values model.retros
-                |> List.map (choice model.currentChoice)
+            (EveryDict.values retros
+                |> List.map (choice current)
             )
         ]
 
