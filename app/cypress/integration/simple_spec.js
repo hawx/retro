@@ -1,6 +1,6 @@
 describe('retro', function() {
   it('visits the app', function() {
-    cy.visit('http://localhost:8080');
+    cy.visit('http://localhost:8080/reset');
 
     cy.contains('Sign-in with Test').click();
 

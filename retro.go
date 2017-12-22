@@ -52,6 +52,14 @@ func main() {
 		testLogin, testCallback := auth.Test(room.AuthCallback)
 		http.Handle("/oauth/test/login", testLogin)
 		http.Handle("/oauth/test/callback", testCallback)
+
+		http.HandleFunc("/reset", func(w http.ResponseWriter, r *http.Request) {
+			if err := db.Reset(); err != nil {
+				log.Fatal(err)
+			}
+
+			http.Redirect(w, r, "/", http.StatusFound)
+		})
 	}
 
 	if conf.GitHub != nil {

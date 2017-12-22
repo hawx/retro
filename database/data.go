@@ -21,6 +21,23 @@ func Open(path string) (*Database, error) {
 	return db, db.setup()
 }
 
+func (d *Database) Reset() error {
+	_, err := d.db.Exec(`
+    DROP TABLE users;
+    DROP TABLE retros;
+    DROP TABLE participants;
+    DROP TABLE columns;
+    DROP TABLE cards;
+    DROP TABLE contents;
+    DROP TABLE votes;
+`)
+	if err != nil {
+		return err
+	}
+
+	return d.setup()
+}
+
 func (d *Database) setup() error {
 	_, err := d.db.Exec(`
     CREATE TABLE IF NOT EXISTS users (
