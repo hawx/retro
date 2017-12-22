@@ -8,6 +8,7 @@ module Page.Menu
         )
 
 import Bulma
+import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Page.MenuModel exposing (..)
@@ -24,10 +25,9 @@ import Views.Menu.New
 
 empty : Model
 empty =
-    { retroList = []
+    { retros = EveryDict.empty
     , retroName = ""
     , possibleParticipants = []
-    , participants = []
     , participant = ""
     , currentChoice = Nothing
     , showNewRetro = False
@@ -49,27 +49,26 @@ update sender msg model =
             { model | showNewRetro = True, currentChoice = Nothing } ! []
 
         CreateRetro ->
-            model ! [ Sock.createRetro sender model.retroName model.participants ]
+            model ! [ Sock.createRetro sender model.retroName [] ]
 
         SetParticipant input ->
             { model | participant = input } ! []
 
         AddParticipant ->
-            { model
-                | participant = ""
-                , participants = model.participant :: model.participants
-            }
-                ! []
+            { model | participant = "" }
+                ! [ Maybe.map (\retro -> Sock.addParticipant sender retro model.participant) model.currentChoice
+                        |> Maybe.withDefault Cmd.none
+                  ]
 
         DeleteParticipant name ->
-            { model | participants = List.filter ((/=) name) model.participants } ! []
-
-        SelectParticipant name ->
-            { model | participants = name :: model.participants } ! []
+            model
+                ! [ Maybe.map (\retro -> Sock.deleteParticipant sender retro name) model.currentChoice
+                        |> Maybe.withDefault Cmd.none
+                  ]
 
         ShowRetroDetails retroId ->
             { model
-                | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList
+                | currentChoice = Just retroId
                 , showNewRetro = False
             }
                 ! []
@@ -87,20 +86,36 @@ socketUpdate msg model =
         Sock.User { username } ->
             { model | possibleParticipants = username :: model.possibleParticipants } ! []
 
+        Sock.AddParticipant { retroId, participant } ->
+            { model | retros = EveryDict.update retroId (Maybe.map (addParticipant participant)) model.retros } ! []
+
+        Sock.DeleteParticipant { retroId, participant } ->
+            { model | retros = EveryDict.update retroId (Maybe.map (deleteParticipant participant)) model.retros } ! []
+
         Sock.Retro { id, name, createdAt, participants } ->
             let
                 newRetro =
                     Retro id name createdAt participants
             in
             { model
-                | retroList = newRetro :: model.retroList
-                , currentChoice = Just newRetro
+                | retros = EveryDict.insert id newRetro model.retros
+                , currentChoice = Just id
                 , showNewRetro = False
             }
                 ! []
 
         _ ->
             model ! []
+
+
+addParticipant : String -> Retro -> Retro
+addParticipant participant retro =
+    { retro | participants = retro.participants ++ [ participant ] }
+
+
+deleteParticipant : String -> Retro -> Retro
+deleteParticipant participant retro =
+    { retro | participants = List.filter ((/=) participant) retro.participants }
 
 
 view : String -> Model -> Html Msg
@@ -116,17 +131,11 @@ view currentUser model =
                         [ if model.showNewRetro then
                             Views.Menu.New.view currentUser model
                           else
-                            Maybe.map Views.Menu.Current.view model.currentChoice
+                            model.currentChoice
+                                |> Maybe.andThen (\current -> EveryDict.get current model.retros)
+                                |> Maybe.map (Views.Menu.Current.view currentUser model)
                                 |> Maybe.withDefault (Html.text "")
                         ]
-
-                    -- , Bulma.column [] <|
-                    --     if model.showNewRetro then
-                    --         [ Bulma.box []
-                    --             [ Views.Menu.New.view currentUser model ]
-                    --         ]
-                    --     else
-                    --         []
                     ]
                 ]
             ]

@@ -1,5 +1,7 @@
 module Views.Menu.List exposing (view)
 
+import Data.Retro exposing (Id)
+import EveryDict
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Event
@@ -19,16 +21,18 @@ view model =
         , Html.p [ Attr.class "menu-label" ]
             [ Html.text "Your Retros" ]
         , Html.ul [ Attr.class "menu-list" ]
-            (List.map (choice model.currentChoice) model.retroList)
+            (EveryDict.values model.retros
+                |> List.map (choice model.currentChoice)
+            )
         ]
 
 
-choice : Maybe Retro -> Retro -> Html Msg
+choice : Maybe Id -> Retro -> Html Msg
 choice current { id, name } =
     Html.li []
         [ Html.a
             [ Event.onClick (ShowRetroDetails id)
-            , Attr.classList [ ( "is-active", Just id == Maybe.map .id current ) ]
+            , Attr.classList [ ( "is-active", Just id == current ) ]
             ]
             [ Html.text name ]
         ]

@@ -3,8 +3,10 @@ module Sock
         ( Msg(..)
         , Sender
         , add
+        , addParticipant
         , createRetro
         , delete
+        , deleteParticipant
         , edit
         , group
         , joinRetro
@@ -26,6 +28,7 @@ import Data.Card as Card
 import Data.Column as Column
 import Data.Content as Content
 import Data.IdToken exposing (IdToken)
+import Data.Retro as Retro
 import Date exposing (Date)
 import Dict
 import Json.Decode as Decode
@@ -49,6 +52,8 @@ type Msg
     | Delete DeleteData
     | User UserData
     | Retro RetroData
+    | AddParticipant ParticipantData
+    | DeleteParticipant ParticipantData
 
 
 type alias ErrorData =
@@ -220,8 +225,21 @@ userDecoder =
         |> Pipeline.required "username" Decode.string
 
 
+type alias ParticipantData =
+    { retroId : Retro.Id
+    , participant : String
+    }
+
+
+participantDecoder : Decode.Decoder ParticipantData
+participantDecoder =
+    Pipeline.decode ParticipantData
+        |> Pipeline.required "retroId" Retro.decodeId
+        |> Pipeline.required "participant" Decode.string
+
+
 type alias RetroData =
-    { id : String
+    { id : Retro.Id
     , name : String
     , createdAt : Date
     , participants : List String
@@ -231,7 +249,7 @@ type alias RetroData =
 retroDecoder : Decode.Decoder RetroData
 retroDecoder =
     Pipeline.decode RetroData
-        |> Pipeline.required "id" Decode.string
+        |> Pipeline.required "id" Retro.decodeId
         |> Pipeline.required "name" Decode.string
         |> Pipeline.required "createdAt" decodeDate
         |> Pipeline.required "participants" (Decode.list Decode.string)
@@ -283,6 +301,12 @@ decodeData result =
 
                 "user" ->
                     decodeOperation User userDecoder data
+
+                "addParticipant" ->
+                    decodeOperation AddParticipant participantDecoder data
+
+                "deleteParticipant" ->
+                    decodeOperation DeleteParticipant participantDecoder data
 
                 "retro" ->
                     decodeOperation Retro retroDecoder data
@@ -421,6 +445,24 @@ createRetro sender name users =
         Encode.object
             [ ( "name", Encode.string name )
             , ( "users", Encode.list (List.map Encode.string users) )
+            ]
+
+
+addParticipant : Sender msg -> Retro.Id -> String -> Cmd msg
+addParticipant sender retroId participant =
+    sender "addParticipant" <|
+        Encode.object
+            [ ( "retroId", Retro.encodeId retroId )
+            , ( "participant", Encode.string participant )
+            ]
+
+
+deleteParticipant : Sender msg -> Retro.Id -> String -> Cmd msg
+deleteParticipant sender retroId participant =
+    sender "deleteParticipant" <|
+        Encode.object
+            [ ( "retroId", Retro.encodeId retroId )
+            , ( "participant", Encode.string participant )
             ]
 
 
