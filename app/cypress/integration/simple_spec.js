@@ -10,5 +10,15 @@ describe('retro', function() {
     cy.get('#create').click();
 
     cy.get('#open').click();
+
+    cy.get('.column:first-child').within((column) => {
+      cy.get('textarea').type('halp');
+      cy.get('a').click();
+      cy.get('.card').its('length').should('eq', 2);
+      cy.get('.card').contains('halp');
+
+      cy.get('.card .delete').click();
+      cy.get('.card').its('length').should('eq', 1);
+    });
   });
 });
