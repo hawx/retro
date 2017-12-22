@@ -82,16 +82,23 @@ input attrs =
         ]
 
 
+expandedInput : List (Html.Attribute msg) -> Html msg
+expandedInput attrs =
+    Html.p [ Attr.class "control is-expanded" ]
+        [ Html.input ([ Attr.class "input", Attr.type_ "text" ] ++ attrs) []
+        ]
+
+
 delete : List (Html.Attribute msg) -> Html msg
 delete attrs =
     Html.button (Attr.class "delete" :: attrs) []
 
 
-discard: List (Html.Attribute msg) -> Html msg
+discard : List (Html.Attribute msg) -> Html msg
 discard attrs =
     Html.a (Attr.class "discard" :: attrs)
         [ Html.span [ Attr.class "icon is-small" ]
-            [ Html.i [ Attr.class "fa fa-undo"] []
+            [ Html.i [ Attr.class "fa fa-undo" ] []
             ]
         ]
 

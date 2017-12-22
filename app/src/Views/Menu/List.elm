@@ -10,7 +10,13 @@ import Page.MenuMsg exposing (..)
 view : Model -> Html Msg
 view model =
     Html.div [ Attr.class "menu" ]
-        [ Html.p [ Attr.class "menu-label" ]
+        [ Html.ul [ Attr.class "menu-list" ]
+            [ Html.li []
+                [ Html.a [ Event.onClick NewRetro ]
+                    [ Html.text "+ New Retro" ]
+                ]
+            ]
+        , Html.p [ Attr.class "menu-label" ]
             [ Html.text "Your Retros" ]
         , Html.ul [ Attr.class "menu-list" ]
             (List.map (choice model.currentChoice) model.retroList)

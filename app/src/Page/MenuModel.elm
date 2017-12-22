@@ -18,4 +18,5 @@ type alias Model =
     , participants : List String
     , participant : String
     , currentChoice : Maybe Retro
+    , showNewRetro : Bool
     }

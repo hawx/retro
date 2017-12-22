@@ -5,6 +5,7 @@ import Route exposing (Route)
 
 type Msg
     = CreateRetro
+    | NewRetro
     | SetRetroName String
     | AddParticipant
     | SetParticipant String

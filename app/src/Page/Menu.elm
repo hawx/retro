@@ -30,6 +30,7 @@ empty =
     , participants = []
     , participant = ""
     , currentChoice = Nothing
+    , showNewRetro = False
     }
 
 
@@ -43,6 +44,9 @@ update sender msg model =
     case msg of
         SetRetroName input ->
             { model | retroName = input } ! []
+
+        NewRetro ->
+            { model | showNewRetro = True, currentChoice = Nothing } ! []
 
         CreateRetro ->
             model ! [ Sock.createRetro sender model.retroName model.participants ]
@@ -64,7 +68,11 @@ update sender msg model =
             { model | participants = name :: model.participants } ! []
 
         ShowRetroDetails retroId ->
-            { model | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList } ! []
+            { model
+                | currentChoice = List.head <| List.filter (\x -> x.id == retroId) model.retroList
+                , showNewRetro = False
+            }
+                ! []
 
         Navigate route ->
             model ! [ Route.navigate route ]
@@ -87,6 +95,7 @@ socketUpdate msg model =
             { model
                 | retroList = newRetro :: model.retroList
                 , currentChoice = Just newRetro
+                , showNewRetro = False
             }
                 ! []
 
@@ -101,16 +110,23 @@ view currentUser model =
         , Bulma.section [ Attr.class "fill-height" ]
             [ Bulma.container
                 [ Bulma.columns []
-                    [ Bulma.column []
+                    [ Bulma.column [ Attr.class "is-one-third" ]
                         [ Views.Menu.List.view model ]
                     , Bulma.column []
-                        [ Maybe.map Views.Menu.Current.view model.currentChoice
-                            |> Maybe.withDefault (Html.text "")
+                        [ if model.showNewRetro then
+                            Views.Menu.New.view currentUser model
+                          else
+                            Maybe.map Views.Menu.Current.view model.currentChoice
+                                |> Maybe.withDefault (Html.text "")
                         ]
-                    , Bulma.column []
-                        [ Bulma.box []
-                            [ Views.Menu.New.view currentUser model ]
-                        ]
+
+                    -- , Bulma.column [] <|
+                    --     if model.showNewRetro then
+                    --         [ Bulma.box []
+                    --             [ Views.Menu.New.view currentUser model ]
+                    --         ]
+                    --     else
+                    --         []
                     ]
                 ]
             ]

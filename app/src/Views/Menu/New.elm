@@ -11,6 +11,19 @@ import Page.MenuMsg exposing (..)
 view : String -> Model -> Html Msg
 view currentUser model =
     Html.div []
+        [ Html.div [ Attr.class "field is-grouped" ]
+            [ Bulma.expandedInput
+                [ Event.onInput SetRetroName
+                , Attr.placeholder "Name"
+                ]
+            , Bulma.button [ Event.onClick CreateRetro ] [ Html.text "Create" ]
+            ]
+        ]
+
+
+view2 : String -> Model -> Html Msg
+view2 currentUser model =
+    Html.div []
         [ Html.h2 [ Attr.class "title is-4" ] [ Html.text "Create New" ]
         , Html.div [ Attr.class "field" ]
             [ Bulma.label "Name"
