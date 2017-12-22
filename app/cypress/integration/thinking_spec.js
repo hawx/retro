@@ -1,4 +1,4 @@
-describe('retro', () => {
+describe('when thinking', () => {
   it('can sign-in', () => {
     cy.visit('http://localhost:8080/reset');
 
@@ -15,7 +15,7 @@ describe('retro', () => {
   });
 
   it('adds a new card', () => {
-    cy.get('.column:first-child').within((column) => {
+    cy.contains('.column', 'Start').within((column) => {
       cy.get('textarea').type('halp');
       cy.get('a').click();
       cy.get('.card').its('length').should('eq', 2);
@@ -24,15 +24,26 @@ describe('retro', () => {
   });
 
   it('edits the card', () => {
-    cy.get('.column:first-child .card:not(.add-card)').within((column) => {
+    cy.contains('.card', 'halp').within((card) => {
       cy.get('.card-content').dblclick();
       cy.get('textarea').type('pls{enter}');
       cy.root().contains('halppls');
     });
   });
 
+  it('moves the card', () => {
+    cy.contains('.card', 'halp').within((card) => {
+      cy.root().trigger('mouseover');
+    });
+
+    cy.contains('.column', 'More').within((column) => {
+      cy.root().trigger('dragover');
+      cy.root().trigger('drop');
+    });
+  });
+
   it('deletes the card', () => {
-    cy.get('.column:first-child').within((column) => {
+    cy.contains('.column', 'More').within((column) => {
       cy.get('.card .delete').click();
       cy.get('.card').its('length').should('eq', 1);
     });
