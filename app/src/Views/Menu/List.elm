@@ -1,6 +1,7 @@
 module Views.Menu.List exposing (view)
 
 import Data.Retro exposing (Id)
+import Date
 import EveryDict exposing (EveryDict)
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -22,6 +23,7 @@ view current retros =
             [ Html.text "Your Retros" ]
         , Html.ul [ Attr.class "menu-list" ]
             (EveryDict.values retros
+                |> List.sortBy (.createdAt >> Date.toTime >> negate)
                 |> List.map (choice current)
             )
         ]
