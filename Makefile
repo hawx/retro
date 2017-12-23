@@ -14,6 +14,7 @@ out/config.toml:
 install:
 				go get -v ./...
 				(cd app; npm install)
+				npm i -g elm
 
 .PHONY: test
 test:
