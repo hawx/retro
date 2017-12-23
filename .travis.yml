@@ -4,6 +4,8 @@ language: go
 install:
   - make install
 
+before_script: (cd app; npm rebuild node-sass)
+
 script:
   - make
   - make test
