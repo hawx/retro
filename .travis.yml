@@ -2,7 +2,11 @@ go_import_path: hawx.me/code/retro
 language: go
 
 install:
-  - (cd app; npm install)
+  - make install
+
+script:
+  - make
+  - make test
 
 notifications:
   email: false

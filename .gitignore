@@ -3,3 +3,5 @@ elm-stuff/
 dist/
 /db
 config.toml
+out/
+app/cypress/videos/
