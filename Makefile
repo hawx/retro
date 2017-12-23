@@ -12,6 +12,7 @@ out/config.toml:
 
 .PHONY: install
 install:
+				go get -v ./...
 				(cd app; npm install)
 
 .PHONY: test
