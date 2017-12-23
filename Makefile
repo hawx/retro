@@ -2,7 +2,7 @@
 all: out/retro out/app/dist out/config.toml
 
 out/app/dist:
-				cd app && npm run build -- --output-path ../out/app/dist
+				cd app && npm run build -- --output-path ../out/app/dist --verbose --progress --display verbose
 
 out/retro:
 				go build -o ./out/retro .
