@@ -7,6 +7,7 @@ install:
 before_script:
   - touch config.toml
   - (cd app; npm rebuild node-sass)
+  - npm i -g elm
 
 script:
   - make
