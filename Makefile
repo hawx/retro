@@ -2,7 +2,7 @@
 all: out/retro out/app/dist out/config.toml
 
 out/app/dist:
-				(cd app; npm run build)
+				(cd app; npm run build --progress --verbose)
 				cp -R app/dist out/app
 
 out/retro:
