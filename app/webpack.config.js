@@ -1,35 +1,39 @@
-var CleanWebpackPlugin = require('clean-webpack-plugin');
-var CopyWebpackPlugin = require('copy-webpack-plugin');
+const CleanWebpackPlugin = require('clean-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
+const path = require('path');
 
 module.exports = {
-  entry: './index.js',
+  entry: path.join(__dirname, 'index.js'),
 
   output: {
-    path: './dist',
+    path: path.join(__dirname, 'dist'),
     filename: 'index.js'
   },
 
   resolve: {
-    modulesDirectories: ['node_modules'],
-    extensions: ['', '.js', '.elm']
+    modules: ['node_modules'],
+    extensions: ['.js', '.elm']
   },
 
   module: {
-    loaders: [
+    rules: [
       {
         test: /\.html$/,
         exclude: /node_modules/,
-        loader: 'file?name=[name].[ext]'
+        use: ['file-loader?name=[name].[ext]']
       },
       {
         test: /\.(css|s[ac]ss)$/,
-        loader: ExtractTextPlugin.extract('css!sass')
+        use: ExtractTextPlugin.extract({
+          fallback: 'style-loader',
+          use: ['css-loader', 'sass-loader']
+        })
       },
       {
         test: /\.elm$/,
         exclude: [/elm-stuff/, /node_modules/],
-        loader: 'elm-hot!elm-webpack'
+        use: ['elm-hot-loader', 'elm-webpack-loader']
       }
     ],
 
@@ -42,9 +46,6 @@ module.exports = {
       verbose: true,
       dry: false
     }),
-    new CopyWebpackPlugin([
-      { from: 'src/assets', to: 'assets'}
-    ]),
     new ExtractTextPlugin('styles.css', {
       allChunks: true
     })
