@@ -1,3 +1,4 @@
+sudo: true
 go_import_path: hawx.me/code/retro
 language: go
 
