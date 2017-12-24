@@ -5,6 +5,8 @@ install:
   - make install
 
 before_script:
+  - node --version
+  - npm --version
   - touch config.toml
   - (cd app; npm rebuild node-sass)
   - npm i -g elm
