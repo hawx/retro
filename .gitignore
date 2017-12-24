@@ -5,3 +5,4 @@ dist/
 config.toml
 out/
 app/cypress/videos/
+app/cypress/screenshots/
