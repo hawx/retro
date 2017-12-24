@@ -3,7 +3,8 @@ all: out/retro out/app/dist out/config.toml
 
 out/app/dist:
 				(cd app; npm run build --progress --verbose)
-				cp -R app/dist out/app
+				mkdir -p out/app/dist
+				cp app/dist/* out/app/dist
 
 out/retro:
 				go build -o ./out/retro .
