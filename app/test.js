@@ -16,7 +16,7 @@ retro.on('close', (code) => {
 });
 
 cypress
-  .run({ failOnStatusCode: false })
+  .run()
   .then((results) => {
     console.log(results);
     retro.kill('SIGINT');
