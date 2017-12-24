@@ -2,7 +2,8 @@
 all: out/retro out/app/dist out/config.toml
 
 out/app/dist:
-				(cd app; npm run build -- --output-path ../out/app/dist)
+				(cd app; npm run build)
+				cp -R app/dist out/app
 
 out/retro:
 				go build -o ./out/retro .
@@ -14,7 +15,6 @@ out/config.toml:
 install:
 				go get -v ./...
 				(cd app; npm install)
-				npm i -g elm
 
 .PHONY: test
 test:
