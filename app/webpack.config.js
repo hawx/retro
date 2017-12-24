@@ -23,13 +23,13 @@ module.exports = {
         exclude: /node_modules/,
         use: ['file-loader?name=[name].[ext]']
       },
-      {
-        test: /\.(css|s[ac]ss)$/,
-        use: ExtractTextPlugin.extract({
-          fallback: 'style-loader',
-          use: ['css-loader', 'sass-loader']
-        })
-      },
+      // {
+      //   test: /\.(css|s[ac]ss)$/,
+      //   use: ExtractTextPlugin.extract({
+      //     fallback: 'style-loader',
+      //     use: ['css-loader', 'sass-loader']
+      //   })
+      // },
       {
         test: /\.elm$/,
         exclude: [/elm-stuff/, /node_modules/],
