@@ -1,6 +1,5 @@
 const CleanWebpackPlugin = require('clean-webpack-plugin');
-// const CopyWebpackPlugin = require('copy-webpack-plugin');
-// const ExtractTextPlugin = require('extract-text-webpack-plugin');
+const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const path = require('path');
 
 module.exports = {
@@ -18,23 +17,23 @@ module.exports = {
 
   module: {
     rules: [
-      // {
-      //   test: /\.html$/,
-      //   exclude: /node_modules/,
-      //   use: ['file-loader?name=[name].[ext]']
-      // },
-      // {
-      //   test: /\.(css|s[ac]ss)$/,
-      //   use: ExtractTextPlugin.extract({
-      //     fallback: 'style-loader',
-      //     use: ['css-loader', 'sass-loader']
-      //   })
-      // },
       {
-        test: /\.elm$/,
-        exclude: [/elm-stuff/, /node_modules/],
-        use: ['elm-hot-loader', 'elm-webpack-loader']
-      }
+        test: /\.html$/,
+        exclude: /node_modules/,
+        use: ['file-loader?name=[name].[ext]']
+      },
+      {
+        test: /\.(css|s[ac]ss)$/,
+        use: ExtractTextPlugin.extract({
+          fallback: 'style-loader',
+          use: ['css-loader', 'sass-loader']
+        })
+      },
+      // {
+      //   test: /\.elm$/,
+      //   exclude: [/elm-stuff/, /node_modules/],
+      //   use: ['elm-hot-loader', 'elm-webpack-loader']
+      // }
     ],
 
     noParse: /\.elm$/
@@ -46,9 +45,9 @@ module.exports = {
       verbose: true,
       dry: false
     }),
-    // new ExtractTextPlugin('styles.css', {
-    //   allChunks: true
-    // })
+    new ExtractTextPlugin('styles.css', {
+      allChunks: true
+    })
   ],
 
   devServer: {
