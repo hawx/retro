@@ -1,13 +1,4 @@
 describe('when thinking', () => {
-  it('checks the response first', () => {
-    cy.visit('http://localhost:8080/')
-      .then((resp) => {
-        console.log(resp.status);
-        console.log(resp.headers);
-        console.log(resp.body);
-      });
-  });
-
   it('can sign-in', () => {
     cy.visit('http://localhost:8080/reset');
 

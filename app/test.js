@@ -20,6 +20,7 @@ cypress
   .then((results) => {
     console.log(results);
     retro.kill('SIGINT');
+    process.exit(results.failures.length);
   })
   .catch((err) => {
     console.error(err);
