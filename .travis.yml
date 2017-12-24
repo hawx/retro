@@ -13,7 +13,6 @@ before_script:
 
 script:
   - make
-  - make test
 
 notifications:
   email: false
