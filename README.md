@@ -1,6 +1,6 @@
 # retro
 
-![](https://travis-ci.org/hawx/retro.svg?branch=cypress)
+![](https://travis-ci.org/hawx/retro.svg?branch=master)
 
 A webapp for running (remote) retrospectives.
 
