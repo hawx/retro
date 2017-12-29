@@ -1,0 +1,34 @@
+go_import_path: hawx.me/code/retro
+language: go
+
+# https://github.com/elm-lang/elm-compiler/issues/1473#issuecomment-245704142
+cache:
+  directories:
+    - sysconfcpus
+
+install:
+  - make install
+  - |
+    if [ ! -d sysconfcpus/bin ];
+    then
+      git clone https://github.com/obmarg/libsysconfcpus.git;
+      cd libsysconfcpus;
+      ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
+      make && make install;
+      cd ..;
+    fi
+
+before_script:
+  - node --version
+  - npm --version
+  - touch config.toml
+  - npm i -g elm
+  - (cd app; npm rebuild node-sass; elm package install -y)
+
+script:
+  - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2 make
+  - ls -R out
+  - make test
+
+notifications:
+  email: false

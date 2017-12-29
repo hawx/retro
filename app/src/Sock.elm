@@ -69,6 +69,7 @@ errorDecoder =
 type alias HelloData =
     { hasGitHub : Bool
     , hasOffice365 : Bool
+    , hasTest : Bool
     }
 
 
@@ -77,6 +78,7 @@ helloDecoder =
     Pipeline.decode HelloData
         |> Pipeline.required "hasGitHub" Decode.bool
         |> Pipeline.required "hasOffice365" Decode.bool
+        |> Pipeline.required "hasTest" Decode.bool
 
 
 type alias StageData =

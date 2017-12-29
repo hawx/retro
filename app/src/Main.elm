@@ -51,6 +51,7 @@ type alias Model =
     , menu : Menu.Model
     , retro : Retro.Model
     , connected : Bool
+    , hasTest : Bool
     , hasGitHub : Bool
     , hasOffice365 : Bool
     }
@@ -68,6 +69,7 @@ init flags location =
                 , menu = Menu.empty
                 , retro = Retro.empty
                 , connected = False
+                , hasTest = False
                 , hasGitHub = False
                 , hasOffice365 = False
                 }
@@ -196,8 +198,8 @@ socketUpdate msg model =
         Sock.Error { error } ->
             handleError error model
 
-        Sock.Hello { hasGitHub, hasOffice365 } ->
-            { model | hasGitHub = hasGitHub, hasOffice365 = hasOffice365 } ! []
+        Sock.Hello { hasTest, hasGitHub, hasOffice365 } ->
+            { model | hasTest = hasTest, hasGitHub = hasGitHub, hasOffice365 = hasOffice365 } ! []
 
         _ ->
             model ! []

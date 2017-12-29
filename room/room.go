@@ -25,6 +25,7 @@ type Room struct {
 type Config struct {
 	HasGitHub    bool
 	HasOffice365 bool
+	HasTest      bool
 }
 
 func New(config Config, db *database.Database) *Room {

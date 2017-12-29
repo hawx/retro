@@ -44,7 +44,8 @@ view currentUser model retro =
         , Html.div [ Attr.class "field" ]
             [ Html.div [ Attr.class "control" ]
                 [ Html.a
-                    [ Attr.class "button is-primary"
+                    [ Attr.id "open"
+                    , Attr.class "button is-primary"
                     , Event.onClick (Navigate (Retro.idToRoute retro.id))
                     ]
                     [ Html.text "Open" ]

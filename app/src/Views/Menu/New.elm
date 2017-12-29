@@ -16,6 +16,6 @@ view currentUser model =
                 [ Event.onInput SetRetroName
                 , Attr.placeholder "Name"
                 ]
-            , Bulma.button [ Event.onClick CreateRetro ] [ Html.text "Create" ]
+            , Bulma.button [ Attr.id "create", Event.onClick CreateRetro ] [ Html.text "Create" ]
             ]
         ]
