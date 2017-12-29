@@ -1,7 +1,11 @@
 const cypress = require('cypress');
 const { spawn } = require('child_process');
+const { join } = require('path');
 
-const retro = spawn('../out/retro', ['--test', '--config', '/dev/null', '--assets', '../out/app/dist']);
+const retro = spawn(join(__dirname, '../out/retro'),
+                    ['--test',
+                     '--config', '/dev/null',
+                     '--assets', join(__dirname, '../out/app/dist')]);
 
 retro.stdout.on('data', (data) => {
   console.log(`stdout: ${data}`);
@@ -16,11 +20,10 @@ retro.on('close', (code) => {
 });
 
 cypress
-  .run()
+  .run({ project: __dirname })
   .then((results) => {
-    console.log(results);
     retro.kill('SIGINT');
-    process.exit(results.failures.length);
+    process.exit(results.failures);
   })
   .catch((err) => {
     console.error(err);

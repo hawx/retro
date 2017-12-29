@@ -19,8 +19,7 @@ install:
 
 .PHONY: test
 test:
-				go test ./...
-				(cd app; node test.js)
+				go test ./... && node app/test.js
 
 .PHONY: clean
 clean:
