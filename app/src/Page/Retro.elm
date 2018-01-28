@@ -8,6 +8,7 @@ module Page.Retro
         )
 
 import Bulma
+import Data.Column as Column
 import Data.Retro as Retro
 import Dict
 import DragAndDrop
@@ -30,7 +31,7 @@ import Views.Retro.Voting
 empty : Model
 empty =
     { retro = Retro.empty
-    , input = ""
+    , inputs = EveryDict.empty
     , dnd = DragAndDrop.empty
     , lastRevealed = Nothing
     }
@@ -85,10 +86,14 @@ update sender msg model =
                     { model | dnd = DragAndDrop.update subMsg model.dnd } ! []
 
         ChangeInput columnId input ->
-            { model | input = String.trim input } ! []
+            { model | inputs = EveryDict.insert columnId (String.trim input) model.inputs } ! []
 
         CreateCard columnId ->
-            { model | input = "" } ! [ Sock.add sender columnId model.input ]
+            { model | inputs = EveryDict.remove columnId model.inputs }
+                ! [ EveryDict.get columnId model.inputs
+                        |> Maybe.map (Sock.add sender columnId)
+                        |> Maybe.withDefault Cmd.none
+                  ]
 
         DeleteCard columnId cardId ->
             model ! [ Sock.delete sender columnId cardId ]
@@ -97,10 +102,14 @@ update sender msg model =
             { model | retro = Retro.editingCard columnId cardId True model.retro } ! []
 
         UpdateCard columnId cardId contentId ->
-            { model | input = "", retro = Retro.editingCard columnId cardId False model.retro } ! [ Sock.edit sender contentId columnId cardId model.input ]
+            { model
+                | inputs = EveryDict.remove columnId model.inputs
+                , retro = Retro.editingCard columnId cardId False model.retro
+            }
+                ! [ Sock.edit sender contentId columnId cardId (EveryDict.get columnId model.inputs |> Maybe.withDefault "") ]
 
         DiscardEditCard columnId cardId ->
-            { model | input = "", retro = Retro.editingCard columnId cardId False model.retro } ! []
+            { model | inputs = EveryDict.remove columnId model.inputs, retro = Retro.editingCard columnId cardId False model.retro } ! []
 
         Navigate route ->
             model ! [ Route.navigate route ]

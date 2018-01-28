@@ -4,6 +4,7 @@ import Data.Card as Card
 import Data.Column as Column
 import Data.Retro exposing (Retro)
 import DragAndDrop
+import EveryDict exposing (EveryDict)
 
 
 type alias CardDragging =
@@ -16,7 +17,7 @@ type alias CardOver =
 
 type alias Model =
     { retro : Retro
-    , input : String
+    , inputs : EveryDict Column.Id String
     , dnd : DragAndDrop.Model CardDragging CardOver
     , lastRevealed : Maybe Card.Id
     }

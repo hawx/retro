@@ -20,19 +20,19 @@ import Views.Retro.TitleCard
 
 view : String -> Model -> Html Msg
 view username model =
-    columnsView username model.retro.stage model.dnd model.input model.retro.columns
+    columnsView username model.retro.stage model.dnd model.inputs model.retro.columns
 
 
-columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> EveryDict Column.Id Column -> Html Msg
-columnsView username stage dnd input columns =
+columnsView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> EveryDict Column.Id String -> EveryDict Column.Id Column -> Html Msg
+columnsView username stage dnd inputs columns =
     EveryDict.toList columns
         |> List.sortBy (\( _, b ) -> b.order)
-        |> List.map (columnView username stage dnd input)
+        |> List.map (\( i, c ) -> columnView username stage dnd (EveryDict.get i inputs |> Maybe.withDefault "") i c)
         |> Bulma.columns []
 
 
-columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> ( Column.Id, Column ) -> Html Msg
-columnView username stage dnd input ( columnId, column ) =
+columnView : String -> Retro.Stage -> DragAndDrop.Model CardDragging CardOver -> String -> Column.Id -> Column -> Html Msg
+columnView username stage dnd input columnId column =
     let
         title =
             [ Views.Retro.TitleCard.view column.name ]
